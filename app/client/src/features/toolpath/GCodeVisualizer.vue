@@ -166,7 +166,7 @@
               <span v-if="toolInventory[t].toolId" class="tool-id-label">#{{ toolInventory[t].toolId }}</span>
               <template v-if="toolInventory[t].diameter || toolInventory[t].type">
                 <span v-if="toolInventory[t].toolId && (toolInventory[t].diameter || toolInventory[t].type)"> - </span>
-                <span v-if="toolInventory[t].diameter">Ø{{ toolInventory[t].diameter.toFixed(3) }}mm</span>
+                <span v-if="toolInventory[t].diameter">Ø{{ appStore.unitsPreference.value === 'imperial' ? mmToInches(toolInventory[t].diameter).toFixed(4) : toolInventory[t].diameter.toFixed(3) }}{{ getDistanceUnitLabel(appStore.unitsPreference.value) }}</span>
                 <span v-if="toolInventory[t].diameter && toolInventory[t].type"> - </span>
                 <span v-if="toolInventory[t].type">{{
                   { 'flat': 'Flat End Mill', 'ball': 'Ball End Mill', 'v-bit': 'V-Bit',
@@ -513,6 +513,7 @@ import { getSettings, updateSettings, settingsStore } from '../../lib/settings-s
 import { getToolsFromInit } from '@/lib/init';
 import { useToolpathStore } from './store';
 import { useAppStore } from '../../composables/use-app-store';
+import { mmToInches, getDistanceUnitLabel } from '../../lib/units';
 import Dialog from '../../components/Dialog.vue';
 import ConfirmPanel from '../../components/ConfirmPanel.vue';
 import ProgressBar from '../../components/ProgressBar.vue';
@@ -3632,7 +3633,11 @@ const getToolTooltip = (toolNumber: number): string => {
 
   const details: string[] = [];
   if (toolInfo.name) details.push(toolInfo.name);
-  if (toolInfo.diameter) details.push(`Ø${toolInfo.diameter.toFixed(3)}mm`);
+  if (toolInfo.diameter) {
+    const units = appStore.unitsPreference.value;
+    const diameter = units === 'imperial' ? mmToInches(toolInfo.diameter).toFixed(4) : toolInfo.diameter.toFixed(3);
+    details.push(`Ø${diameter}${getDistanceUnitLabel(units)}`);
+  }
   if (toolInfo.type) {
     const typeMap: Record<string, string> = {
       'flat': 'Flat End Mill',
