@@ -130,4 +130,4 @@ git push origin "$NEW_TAG"
 
 echo ""
 echo "✅ Successfully created and pushed $NEW_TAG"
-echo "CI pipeline will build the release at: https://github.com/siganberg/ncSender/actions"
+echo "CI pipeline will build the release at: https://github.com/Alex-Nemet/ncSender/actions"
