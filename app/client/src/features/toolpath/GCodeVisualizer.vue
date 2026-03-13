@@ -166,7 +166,7 @@
               <span v-if="toolInventory[t].toolId" class="tool-id-label">#{{ toolInventory[t].toolId }}</span>
               <template v-if="toolInventory[t].diameter || toolInventory[t].type">
                 <span v-if="toolInventory[t].toolId && (toolInventory[t].diameter || toolInventory[t].type)"> - </span>
-                <span v-if="toolInventory[t].diameter">Ø{{ appStore.unitsPreference.value === 'imperial' ? mmToInches(toolInventory[t].diameter).toFixed(4) : toolInventory[t].diameter.toFixed(3) }}{{ getDistanceUnitLabel(appStore.unitsPreference.value) }}</span>
+                <span v-if="toolInventory[t].diameter">Ø{{ formatDiameter(toolInventory[t].diameter) }}{{ getDistanceUnitLabel(appStore.unitsPreference.value) }}</span>
                 <span v-if="toolInventory[t].diameter && toolInventory[t].type"> - </span>
                 <span v-if="toolInventory[t].type">{{
                   { 'flat': 'Flat End Mill', 'ball': 'Ball End Mill', 'v-bit': 'V-Bit',
@@ -3622,6 +3622,13 @@ const loadToolInventory = async () => {
   }
 };
 
+const formatDiameter = (mm: number): string => {
+  if (appStore.unitsPreference.value === 'imperial') {
+    return mmToInches(mm).toFixed(4);
+  }
+  return mm.toFixed(3);
+};
+
 // Get enhanced tooltip for tool (includes inventory data if available)
 const getToolTooltip = (toolNumber: number): string => {
   const baseText = props.currentTool === toolNumber
@@ -3633,11 +3640,7 @@ const getToolTooltip = (toolNumber: number): string => {
 
   const details: string[] = [];
   if (toolInfo.name) details.push(toolInfo.name);
-  if (toolInfo.diameter) {
-    const units = appStore.unitsPreference.value;
-    const diameter = units === 'imperial' ? mmToInches(toolInfo.diameter).toFixed(4) : toolInfo.diameter.toFixed(3);
-    details.push(`Ø${diameter}${getDistanceUnitLabel(units)}`);
-  }
+  if (toolInfo.diameter) details.push(`Ø${formatDiameter(toolInfo.diameter)}${getDistanceUnitLabel(appStore.unitsPreference.value)}`);
   if (toolInfo.type) {
     const typeMap: Record<string, string> = {
       'flat': 'Flat End Mill',
