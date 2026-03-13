@@ -618,8 +618,8 @@ const onWorkspaceChange = (e: Event) => {
   height: 14px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #28a745;
-  box-shadow: 0 0 8px rgba(40, 167, 69, 0.8), 0 0 16px rgba(40, 167, 69, 0.4);
+  background: #1a7fd4;
+  box-shadow: 0 0 8px rgba(26, 127, 212, 0.8), 0 0 16px rgba(26, 127, 212, 0.4);
 }
 
 .pin-led--large {
@@ -628,17 +628,30 @@ const onWorkspaceChange = (e: Event) => {
 }
 
 .pin-led--active {
-  background: #dc3545;
-  box-shadow: 0 0 10px rgba(220, 53, 69, 0.9), 0 0 20px rgba(220, 53, 69, 0.5);
-  animation: led-pulse-red 1.5s ease-in-out infinite;
+  background: #f5c400;
+  box-shadow: 0 0 10px rgba(245, 196, 0, 0.9), 0 0 20px rgba(245, 196, 0, 0.5);
+  animation: led-pulse-yellow 1.5s ease-in-out infinite;
+  position: relative;
 }
 
-@keyframes led-pulse-red {
+.pin-led--active::after {
+  content: '✕';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  line-height: 1;
+  color: #dc3545;
+  font-weight: 900;
+}
+
+@keyframes led-pulse-yellow {
   0%, 100% {
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.9), 0 0 20px rgba(220, 53, 69, 0.5);
+    box-shadow: 0 0 10px rgba(245, 196, 0, 0.9), 0 0 20px rgba(245, 196, 0, 0.5);
   }
   50% {
-    box-shadow: 0 0 14px rgba(220, 53, 69, 1), 0 0 28px rgba(220, 53, 69, 0.7);
+    box-shadow: 0 0 14px rgba(245, 196, 0, 1), 0 0 28px rgba(245, 196, 0, 0.7);
   }
 }
 
