@@ -2307,9 +2307,15 @@ const handleGCodeUpdate = async (data: { filename: string; content?: string; tim
     const currentStatus = props.senderStatus?.toLowerCase();
     const isToolChanging = props.machineState?.isToolChanging === true;
     if (currentStatus === 'idle' && !isToolChanging) {
-      showOutOfBoundsWarning.value = gcodeVisualizer.hasOutOfBoundsMovement();
-      outOfBoundsAxes.value = gcodeVisualizer.getOutOfBoundsAxes();
-      outOfBoundsDirections.value = gcodeVisualizer.getOutOfBoundsDirections();
+      const wco = props.workOffset;
+      const wcoIsUnset = !wco || (wco.x === 0 && wco.y === 0 && wco.z === 0);
+      if (wcoIsUnset) {
+        showOutOfBoundsWarning.value = false;
+      } else {
+        showOutOfBoundsWarning.value = gcodeVisualizer.hasOutOfBoundsMovement();
+        outOfBoundsAxes.value = gcodeVisualizer.getOutOfBoundsAxes();
+        outOfBoundsDirections.value = gcodeVisualizer.getOutOfBoundsDirections();
+      }
     }
 
     // Reset all line type visibility to true when loading new G-code
@@ -2970,6 +2976,12 @@ watch(() => props.workOffset, (newOffset) => {
   }
   gcodeVisualizer?.setWorkOffset(newOffset);
   rebuildGrid(newOffset);
+  // Only show OOB warning in pre-run state with work zeros actually set.
+  // Avoids false alarms when GRBL resets WCS after job completion (e.g. G55 -> G54).
+  const wcoIsUnset = !newOffset || (newOffset.x === 0 && newOffset.y === 0 && newOffset.z === 0);
+  if (wcoIsUnset || !showPreRunState.value) {
+    showOutOfBoundsWarning.value = false;
+  }
   requestRender();
 }, { deep: true });
 
