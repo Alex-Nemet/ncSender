@@ -29,7 +29,7 @@ const { log, error: logError, warn: logWarn } = createLogger('UpdateManager');
 const require = createRequire(import.meta.url);
 const { autoUpdater } = require('electron-updater');
 
-const OWNER = 'siganberg';
+const OWNER = 'Alex-Nemet';
 const REPO = 'ncSender';
 const USER_AGENT = 'ncSender/auto-updater';
 

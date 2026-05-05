@@ -357,6 +357,18 @@ jobs:
             cp "artifacts/linux-arm64-artifacts/latest-linux.yml" "release-assets/beta-linux-arm64.yml"
           fi
 
+          # Rewrite Windows updater manifest to match renamed asset filename
+          if [ -f "release-assets/beta.yml" ]; then
+            VERSION="${VERSION}" TAG="${TAG}" python3 -c "
+from pathlib import Path; import os, re
+path = Path('release-assets/beta.yml')
+text = path.read_text()
+version = os.environ['VERSION']; tag = os.environ['TAG']
+text = re.sub(r'ncSender[- ]Setup[- ]' + re.escape(version) + r'\.exe', f'ncSender_{tag}_windows_x64.exe', text, flags=re.IGNORECASE)
+path.write_text(text)
+"
+          fi
+
           # Rewrite Linux updater manifests to match renamed asset filenames
           if [ -f "release-assets/beta-linux.yml" ]; then
             VERSION="${VERSION}" TAG="${TAG}" python3 -c "from pathlib import Path; import os; path = Path('release-assets/beta-linux.yml'); text = path.read_text(); version = os.environ['VERSION']; tag = os.environ['TAG']; text = text.replace(f'ncsender_{version}_amd64.deb', f'ncSender_{tag}_linux_x64.deb'); path.write_text(text)"
