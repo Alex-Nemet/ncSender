@@ -305,26 +305,9 @@ export function registerCncEventHandlers({
       jobManager.forceReset();
     }
 
-    // Send M5 (spindle off) when door is first detected and $61 bit 0 is set
-    const isDoorActive = currentMachineStatus === 'door' || (status?.Pn || '').includes('D');
-    const wasDoorActive = prevMachineStatus === 'door' || (prevMachineState?.Pn || '').includes('D');
-    if (isDoorActive && !wasDoorActive) {
-      try {
-        const fwText = await fs.readFile(firmwareFilePath, 'utf8');
-        const fwData = JSON.parse(fwText);
-        const setting61 = parseInt(fwData.settings?.['61']?.value, 10) || 0;
-        if (setting61 & 1) {
-          log(`Door opened with $61=${setting61} (bit 0 set), sending M5 to stop spindle`);
-          cncController.sendCommand('M5', {
-            commandId: `door-m5-${Date.now()}`,
-            displayCommand: 'M5 (Door safety: spindle off)',
-            meta: { sourceId: 'system' }
-          });
-        }
-      } catch (err) {
-        log('Could not check $61 for door spindle-off:', err?.message || err);
-      }
-    }
+    // grblHAL natively stops the spindle as part of its door/safety sequence.
+    // Do NOT send an explicit M5 here — it queues in the planner buffer and
+    // executes after resume, killing the spindle mid-cut.
 
     if (hasChanged) {
       broadcast('server-state-updated', serverState);
