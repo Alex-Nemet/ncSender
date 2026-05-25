@@ -347,14 +347,7 @@ jobs:
 
           # Rewrite Windows updater manifest to match renamed asset filename
           if [ -f "release-assets/latest.yml" ]; then
-            VERSION="${VERSION}" TAG="${TAG}" python3 -c "
-from pathlib import Path; import os, re
-path = Path('release-assets/latest.yml')
-text = path.read_text()
-version = os.environ['VERSION']; tag = os.environ['TAG']
-text = re.sub(r'ncSender[- ]Setup[- ]' + re.escape(version) + r'\.exe', f'ncSender_{tag}_windows_x64.exe', text, flags=re.IGNORECASE)
-path.write_text(text)
-"
+            VERSION="${VERSION}" TAG="${TAG}" python3 -c "from pathlib import Path; import os, re; path = Path('release-assets/latest.yml'); text = path.read_text(); version = os.environ['VERSION']; tag = os.environ['TAG']; text = re.sub(r'ncSender[- ]Setup[- ]' + re.escape(version) + r'\.exe', f'ncSender_{tag}_windows_x64.exe', text, flags=re.IGNORECASE); path.write_text(text)"
           fi
 
           # Rewrite Linux updater manifests to match renamed asset filenames
