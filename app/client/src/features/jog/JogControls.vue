@@ -166,6 +166,11 @@ const handleCenterClick = async () => {
 let isLongPress = false;
 let activeJogId: string | null = null;
 
+const jogDebug = (event: string, detail?: string) => {
+  console.log(`[JogDebug] ${event}${detail ? ': ' + detail : ''} t=${Date.now()}`);
+  api.sendWebSocketMessage('jog:debug', { event, detail }).catch(() => {});
+};
+
 const createJogId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 // Track which buttons are pressed for visual feedback
@@ -237,6 +242,7 @@ const continuousJog = async (axis: 'X' | 'Y' | 'Z', direction: 1 | -1) => {
   const command = `$J=${unitsCode} G91 ${axis}${travelSign}${travelFormatted} F${feedRateFormatted}`;
   const jogId = createJogId();
   activeJogId = jogId;
+  jogDebug('continuous-start', `${axis}${direction > 0 ? '+' : '-'} jogId=${jogId} cmd=${command}`);
 
   try {
     await jogStart({
@@ -248,6 +254,7 @@ const continuousJog = async (axis: 'X' | 'Y' | 'Z', direction: 1 | -1) => {
       feedRate: feedRateRaw
     });
   } catch (error) {
+    jogDebug('continuous-start-FAILED', `jogId=${jogId} err=${(error as Error)?.message}`);
     console.error('Failed to start continuous jog:', error);
     if (activeJogId === jogId) {
       activeJogId = null;
@@ -268,6 +275,7 @@ const continuousDiagonalJog = async (xDirection: 1 | -1, yDirection: 1 | -1) => 
   const command = `$J=${unitsCode} G91 X${xSign}${xTravelFormatted} Y${ySign}${yTravelFormatted} F${feedRateFormatted}`;
   const jogId = createJogId();
   activeJogId = jogId;
+  jogDebug('diagonal-continuous-start', `X${xSign}Y${ySign} jogId=${jogId} cmd=${command}`);
 
   try {
     await jogStart({
@@ -279,6 +287,7 @@ const continuousDiagonalJog = async (xDirection: 1 | -1, yDirection: 1 | -1) => 
       feedRate: props.feedRate
     });
   } catch (error) {
+    jogDebug('diagonal-continuous-start-FAILED', `jogId=${jogId} err=${(error as Error)?.message}`);
     console.error('Failed to start diagonal continuous jog:', error);
     if (activeJogId === jogId) {
       activeJogId = null;
@@ -295,6 +304,7 @@ const handleJogStart = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event)
     return;
   }
 
+  jogDebug('button-press', `${axis}${direction > 0 ? '+' : '-'}`);
   const buttonId = getButtonId(axis, direction);
   setButtonPressed(buttonId);
 
@@ -314,6 +324,7 @@ const handleJogDiagonalStart = (xDirection: 1 | -1, yDirection: 1 | -1, event?: 
     return;
   }
 
+  jogDebug('button-press', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'}`);
   const buttonId = getButtonId('', undefined, xDirection, yDirection);
   setButtonPressed(buttonId);
 
@@ -328,6 +339,7 @@ const handleJogEnd = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event) =
   if (event) {
     event.preventDefault();
   }
+  jogDebug('button-release', `${axis}${direction > 0 ? '+' : '-'} isLongPress=${isLongPress} activeJogId=${activeJogId}`);
   const buttonId = getButtonId(axis, direction);
   setButtonReleased(buttonId);
 
@@ -346,6 +358,7 @@ const handleJogDiagonalEnd = (xDirection: 1 | -1, yDirection: 1 | -1, event?: Ev
   if (event) {
     event.preventDefault();
   }
+  jogDebug('button-release', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'} isLongPress=${isLongPress} activeJogId=${activeJogId}`);
   const buttonId = getButtonId('', undefined, xDirection, yDirection);
   setButtonReleased(buttonId);
 
@@ -362,21 +375,26 @@ const handleJogDiagonalEnd = (xDirection: 1 | -1, yDirection: 1 | -1, event?: Ev
 
 const stopJog = async () => {
   if (!activeJogId) {
+    jogDebug('stop-skipped', 'no activeJogId');
     return;
   }
 
   const jogId = activeJogId;
   activeJogId = null;
+  jogDebug('stop-cancel-sending', `jogId=${jogId} sending 0x85`);
 
   try {
     await api.sendCommandViaWebSocket({
       command: String.fromCharCode(0x85)
     });
+    jogDebug('stop-cancel-sent', `jogId=${jogId} 0x85 delivered`);
   } catch (error) {
+    jogDebug('stop-cancel-FAILED', `jogId=${jogId} err=${(error as Error)?.message}`);
     console.error('Failed to send immediate jog cancel:', error);
   }
 
   jogStop(jogId).catch((error) => {
+    jogDebug('stop-session-FAILED', `jogId=${jogId} err=${(error as Error)?.message}`);
     console.error('Failed to stop jog session:', error);
   });
 };

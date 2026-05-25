@@ -218,5 +218,28 @@ export function createSystemRoutes(serverState, cncController, ensureSenderStatu
     }
   });
 
+  router.post('/logs/open-folder', (req, res) => {
+    const logsDir = getLogsDir();
+    const platform = process.platform;
+    let cmd;
+    if (platform === 'darwin') {
+      cmd = `open "${logsDir}"`;
+    } else if (platform === 'win32') {
+      cmd = `explorer "${logsDir}"`;
+    } else {
+      cmd = `xdg-open "${logsDir}"`;
+    }
+
+    import('node:child_process').then(({ exec }) => {
+      exec(cmd, (err) => {
+        if (err) {
+          log('Failed to open logs folder:', err.message);
+          return res.status(500).json({ error: 'Failed to open folder', path: logsDir });
+        }
+        res.json({ opened: true, path: logsDir });
+      });
+    });
+  });
+
   return router;
 }

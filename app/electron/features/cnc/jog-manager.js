@@ -61,6 +61,9 @@ export class JogSessionManager {
       case 'jog:step':
         await this.executeStep(ws, data);
         break;
+      case 'jog:debug':
+        if (data?.event) log('[ClientDebug]', data.event, data.detail || '');
+        break;
       default:
         log('Received unsupported jog message type:', type);
         break;
@@ -162,7 +165,7 @@ export class JogSessionManager {
       return;
     }
 
-    log('Jog started', `jogId=${jogId}`);
+    log('Jog started', `jogId=${jogId}`, `cmd=${command}`);
 
     this.sendSafe(ws, {
       type: 'jog:started',
@@ -207,6 +210,7 @@ export class JogSessionManager {
     }
 
     if (!skipCancel) {
+      log('Jog cancel sending 0x85', `jogId=${session.jogId}`, `reason=${reason}`);
       try {
         await this.cncController.sendCommand(REALTIME_JOG_CANCEL, {
           meta: {
@@ -214,12 +218,13 @@ export class JogSessionManager {
             stopReason: reason
           }
         });
+        log('Jog cancel sent', `jogId=${session.jogId}`);
       } catch (error) {
         log('Failed to send jog cancel command', `jogId=${session.jogId}`, error?.message || error);
       }
     }
 
-    log('Jog stopped', `jogId=${session.jogId}`, `reason=${reason}`);
+    log('Jog stopped', `jogId=${session.jogId}`, `reason=${reason}`, `skipCancel=${skipCancel}`);
 
     if (notifyClient) {
       this.sendSafe(session.ws, {

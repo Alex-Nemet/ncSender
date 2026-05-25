@@ -247,6 +247,15 @@
               </div>
               <div class="setting-item setting-item--with-note">
                 <div class="setting-item-content">
+                  <label class="setting-label">Server Logs</label>
+                  <div class="settings-note">
+                    Open the folder containing server log files for debugging and diagnostics.
+                  </div>
+                </div>
+                <button class="reset-colors-button" @click="openLogFolder">Open Log Folder</button>
+              </div>
+              <div class="setting-item setting-item--with-note">
+                <div class="setting-item-content">
                   <label class="setting-label">Stop Deceleration Delay</label>
                   <div class="settings-note">
                     Time to wait after Feed Hold before Soft Reset when stopping a job. Allows machine to decelerate smoothly.
@@ -2380,6 +2389,14 @@ const saveColors = async () => {
     accentColor: accentColor.value,
     gradientColor: gradientColor.value
   });
+};
+
+const openLogFolder = async () => {
+  try {
+    await fetch(`${getApiBaseUrl()}/api/logs/open-folder`, { method: 'POST' });
+  } catch (e) {
+    console.error('Failed to open log folder:', e);
+  }
 };
 
 const resetColors = async () => {
