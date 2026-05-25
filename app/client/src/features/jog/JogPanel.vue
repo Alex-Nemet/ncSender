@@ -387,22 +387,14 @@ const zTravelDistance = computed(() => {
   return toDisplayUnits(distanceMm);
 });
 
-const computeAxisBounds = (size: number | undefined, home: AxisHome) => {
+// GRBL machine coordinates are always in [-MaxTravel, 0]. Home is near 0.
+const computeAxisBounds = (size: number | undefined) => {
   const travel = typeof size === 'number' && size > 0 ? size : 0;
-  if (home === 'max') {
-    return {
-      min: -travel,
-      max: 0
-    };
-  }
-  return {
-    min: 0,
-    max: travel
-  };
+  return { min: -travel, max: 0 };
 };
 
-const xAxisBounds = computed(() => computeAxisBounds(props.gridSizeX, orientation.value.xHome));
-const yAxisBounds = computed(() => computeAxisBounds(props.gridSizeY, orientation.value.yHome));
+const xAxisBounds = computed(() => computeAxisBounds(props.gridSizeX));
+const yAxisBounds = computed(() => computeAxisBounds(props.gridSizeY));
 
 const formatMachineCoord = (value: number) => {
   if (!Number.isFinite(value)) return '0';
@@ -439,10 +431,17 @@ const applyLimitMargin = (edge: 'min' | 'max', bounds: { min: number; max: numbe
 const getCornerPosition = (corner: CornerType) => {
   const xBounds = xAxisBounds.value;
   const yBounds = yAxisBounds.value;
-  const xEdge = (corner === 'top-left' || corner === 'bottom-left') ? 'min' : 'max';
-  const yEdge = (corner === 'top-left' || corner === 'top-right') ? 'max' : 'min';
-  const x = applyLimitMargin(xEdge, xBounds);
-  const y = applyLimitMargin(yEdge, yBounds);
+  const { xHome, yHome } = orientation.value;
+
+  const isLeft = corner === 'top-left' || corner === 'bottom-left';
+  const isTop = corner === 'top-left' || corner === 'top-right';
+
+  // Home side is near 0 ('max' edge), opposite side is near -travel ('min' edge)
+  const xHomeSide = (isLeft && xHome === 'min') || (!isLeft && xHome === 'max');
+  const yHomeSide = (isTop && yHome === 'max') || (!isTop && yHome === 'min');
+
+  const x = applyLimitMargin(xHomeSide ? 'max' : 'min', xBounds);
+  const y = applyLimitMargin(yHomeSide ? 'max' : 'min', yBounds);
   return { x, y };
 };
 
