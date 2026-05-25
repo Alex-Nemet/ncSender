@@ -365,7 +365,7 @@ export class CNCController extends EventEmitter {
   parseStatusReport(data) {
     const now = Date.now();
     if (now - (this.lastStatusLogTs || 0) >= 1000) {
-      //log('[status-report raw]', data);
+      log('[status-report raw]', data);
       this.lastStatusLogTs = now;
     }
 
