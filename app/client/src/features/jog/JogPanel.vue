@@ -387,14 +387,22 @@ const zTravelDistance = computed(() => {
   return toDisplayUnits(distanceMm);
 });
 
-// GRBL machine coordinates are always in [-MaxTravel, 0]. Home is near 0.
-const computeAxisBounds = (size: number | undefined) => {
+const computeAxisBounds = (size: number | undefined, home: AxisHome) => {
   const travel = typeof size === 'number' && size > 0 ? size : 0;
-  return { min: -travel, max: 0 };
+  if (home === 'max') {
+    return {
+      min: -travel,
+      max: 0
+    };
+  }
+  return {
+    min: 0,
+    max: travel
+  };
 };
 
-const xAxisBounds = computed(() => computeAxisBounds(props.gridSizeX));
-const yAxisBounds = computed(() => computeAxisBounds(props.gridSizeY));
+const xAxisBounds = computed(() => computeAxisBounds(props.gridSizeX, orientation.value.xHome));
+const yAxisBounds = computed(() => computeAxisBounds(props.gridSizeY, orientation.value.yHome));
 
 const formatMachineCoord = (value: number) => {
   if (!Number.isFinite(value)) return '0';
@@ -407,7 +415,7 @@ const safeZValue = computed(() => getSettings()?.safeZHeight ?? -5);
 
 const safeZCommand = computed(() => formatMachineCoord(safeZValue.value));
 
-const LIMIT_MARGIN_MM = 2;
+const LIMIT_MARGIN_MM = 5;
 
 const applyLimitMargin = (edge: 'min' | 'max', bounds: { min: number; max: number }) => {
   const span = bounds.max - bounds.min;
@@ -431,17 +439,10 @@ const applyLimitMargin = (edge: 'min' | 'max', bounds: { min: number; max: numbe
 const getCornerPosition = (corner: CornerType) => {
   const xBounds = xAxisBounds.value;
   const yBounds = yAxisBounds.value;
-  const { xHome, yHome } = orientation.value;
-
-  const isLeft = corner === 'top-left' || corner === 'bottom-left';
-  const isTop = corner === 'top-left' || corner === 'top-right';
-
-  // Home side is near 0 ('max' edge), opposite side is near -travel ('min' edge)
-  const xHomeSide = (isLeft && xHome === 'min') || (!isLeft && xHome === 'max');
-  const yHomeSide = (isTop && yHome === 'max') || (!isTop && yHome === 'min');
-
-  const x = applyLimitMargin(xHomeSide ? 'max' : 'min', xBounds);
-  const y = applyLimitMargin(yHomeSide ? 'max' : 'min', yBounds);
+  const xEdge = (corner === 'top-left' || corner === 'bottom-left') ? 'min' : 'max';
+  const yEdge = (corner === 'top-left' || corner === 'top-right') ? 'max' : 'min';
+  const x = applyLimitMargin(xEdge, xBounds);
+  const y = applyLimitMargin(yEdge, yBounds);
   return { x, y };
 };
 
