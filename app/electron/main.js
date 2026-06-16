@@ -15,7 +15,7 @@
  * along with ncSender. If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { app, BrowserWindow, nativeTheme, screen } from 'electron';
+import { app, BrowserWindow, nativeTheme, screen, powerMonitor } from 'electron';
 import path from 'node:path';
 import url from 'node:url';
 import { createServer } from './server.js';
@@ -106,6 +106,23 @@ async function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  powerMonitor.on('suspend', () => {
+    log('System suspending — disconnecting CNC to free controller connection slot');
+    if (server?.autoConnector) {
+      server.autoConnector.stop();
+    }
+    if (server?.cncController) {
+      server.cncController.disconnect();
+    }
+  });
+
+  powerMonitor.on('resume', () => {
+    log('System resumed — restarting auto-connect');
+    if (server?.autoConnector) {
+      server.autoConnector.start();
+    }
   });
 
   initializeUpdateManager(mainWindow);

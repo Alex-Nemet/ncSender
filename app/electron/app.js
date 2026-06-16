@@ -252,5 +252,5 @@ export async function createApp(options = {}) {
     await new Promise((resolve) => server.close(resolve));
   };
 
-  return { app, server, wss, port, start, close };
+  return { app, server, wss, port, start, close, cncController, autoConnector };
 }

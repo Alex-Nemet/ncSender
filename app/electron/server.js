@@ -30,6 +30,8 @@ export async function createServer() {
     server: instance.server,
     wss: instance.wss,
     port: instance.port,
-    close: instance.close
+    close: instance.close,
+    cncController: instance.cncController,
+    autoConnector: instance.autoConnector
   };
 }

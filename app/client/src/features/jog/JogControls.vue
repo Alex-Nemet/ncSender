@@ -165,6 +165,23 @@ const handleCenterClick = async () => {
 };
 let isLongPress = false;
 let activeJogId: string | null = null;
+let jogPressActive = false;
+
+const handleGlobalRelease = () => {
+  if (!jogPressActive) return;
+  jogPressActive = false;
+
+  if (jogTimer) {
+    clearTimeout(jogTimer);
+    jogTimer = null;
+  }
+  pressedButtons.value.clear();
+
+  if (isLongPress && activeJogId) {
+    jogDebug('global-safety-release', `activeJogId=${activeJogId}`);
+    stopJog();
+  }
+};
 
 const jogDebug = (event: string, detail?: string) => {
   console.log(`[JogDebug] ${event}${detail ? ': ' + detail : ''} t=${Date.now()}`);
@@ -304,6 +321,7 @@ const handleJogStart = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event)
     return;
   }
 
+  jogPressActive = true;
   jogDebug('button-press', `${axis}${direction > 0 ? '+' : '-'}`);
   const buttonId = getButtonId(axis, direction);
   setButtonPressed(buttonId);
@@ -324,6 +342,7 @@ const handleJogDiagonalStart = (xDirection: 1 | -1, yDirection: 1 | -1, event?: 
     return;
   }
 
+  jogPressActive = true;
   jogDebug('button-press', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'}`);
   const buttonId = getButtonId('', undefined, xDirection, yDirection);
   setButtonPressed(buttonId);
@@ -339,6 +358,7 @@ const handleJogEnd = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event) =
   if (event) {
     event.preventDefault();
   }
+  jogPressActive = false;
   jogDebug('button-release', `${axis}${direction > 0 ? '+' : '-'} isLongPress=${isLongPress} activeJogId=${activeJogId}`);
   const buttonId = getButtonId(axis, direction);
   setButtonReleased(buttonId);
@@ -358,6 +378,7 @@ const handleJogDiagonalEnd = (xDirection: 1 | -1, yDirection: 1 | -1, event?: Ev
   if (event) {
     event.preventDefault();
   }
+  jogPressActive = false;
   jogDebug('button-release', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'} isLongPress=${isLongPress} activeJogId=${activeJogId}`);
   const buttonId = getButtonId('', undefined, xDirection, yDirection);
   setButtonReleased(buttonId);
@@ -421,7 +442,25 @@ const isButtonPressed = (buttonId: string) => {
 
 let unsubscribeJogStopped: (() => void) | null = null;
 
+const handleWindowBlur = () => {
+  if (activeJogId) {
+    jogDebug('window-blur-safety', `activeJogId=${activeJogId}`);
+    jogPressActive = false;
+    pressedButtons.value.clear();
+    if (jogTimer) {
+      clearTimeout(jogTimer);
+      jogTimer = null;
+    }
+    stopJog();
+  }
+};
+
 onMounted(() => {
+  document.addEventListener('mouseup', handleGlobalRelease);
+  document.addEventListener('touchend', handleGlobalRelease);
+  document.addEventListener('touchcancel', handleGlobalRelease);
+  window.addEventListener('blur', handleWindowBlur);
+
   unsubscribeJogStopped = api.on('jog:stopped', (data) => {
     if (!data || !data.jogId) {
       return;
@@ -433,6 +472,11 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  document.removeEventListener('mouseup', handleGlobalRelease);
+  document.removeEventListener('touchend', handleGlobalRelease);
+  document.removeEventListener('touchcancel', handleGlobalRelease);
+  window.removeEventListener('blur', handleWindowBlur);
+
   if (unsubscribeJogStopped) {
     unsubscribeJogStopped();
     unsubscribeJogStopped = null;
