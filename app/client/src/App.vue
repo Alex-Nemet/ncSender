@@ -77,6 +77,8 @@
         :current-tool="status.tool"
         :tool-length-set="status.toolLengthSet"
         :alarm-message="alarmMessage"
+        :job-error="jobError"
+        @dismiss-job-error="dismissJobError"
         @change-view="viewport = $event"
       />
       <RightPanel
@@ -1286,7 +1288,7 @@ const handleDownloadUpdateOnly = async () => {
 };
 
 // SHARED STATE FROM STORE (read-only refs from centralized store)
-const { serverState, status, consoleLines, websocketConnected, lastAlarmCode, alarmMessage, gridSizeX, gridSizeY, zMaxTravel, machineOrientation, isConnected, senderStatus: senderStatusRef, hasFullControl, isLocalClient } = store;
+const { serverState, status, consoleLines, websocketConnected, lastAlarmCode, alarmMessage, jobError, dismissJobError, gridSizeX, gridSizeY, zMaxTravel, machineOrientation, isConnected, senderStatus: senderStatusRef, hasFullControl, isLocalClient } = store;
 
 const currentSenderStatus = computed(() => senderStatusRef.value ?? serverState.senderStatus ?? 'connecting');
 

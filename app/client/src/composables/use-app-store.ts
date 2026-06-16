@@ -141,6 +141,7 @@ function trimConsoleBuffer() {
 const websocketConnected = ref(false);
 const lastAlarmCode = ref<number | string | undefined>(undefined);
 const alarmMessage = ref<string>('');
+const jobError = ref<{ code: number | null; message: string; line: number; command: string; filename: string } | null>(null);
 const isLocalClient = ref<boolean | null>(null); // null = not yet determined
 const remoteControlEnabled = ref(false);
 const remoteStateInitialized = ref(false); // true after WebSocket handshake determines client type
@@ -696,6 +697,11 @@ export function initializeStore() {
     // Alarm display is handled by server-state-updated → machineState
   });
 
+  api.on('job-error', (errorData: { code: number | null; message: string; line: number; command: string; filename: string }) => {
+    if (!errorData) return;
+    jobError.value = errorData;
+  });
+
   // Server state updates (main synchronization event)
   api.onServerStateUpdated(async (newServerState) => {
     Object.assign(serverState, newServerState);
@@ -734,6 +740,11 @@ export function initializeStore() {
     // Try to load machine dimensions when connected
     if (status.connected && websocketConnected.value) {
       await tryLoadMachineDimensionsOnce();
+    }
+
+    // Clear job error when a new job starts
+    if (serverState.jobLoaded?.status === 'running' && lastJobStatus !== 'running') {
+      jobError.value = null;
     }
 
     // If a run starts (status transitions into running), reset completed tracking
@@ -986,6 +997,8 @@ export function useAppStore() {
     websocketConnected: readonly(websocketConnected),
     lastAlarmCode: readonly(lastAlarmCode),
       alarmMessage: readonly(alarmMessage),
+      jobError: readonly(jobError),
+      dismissJobError: () => { jobError.value = null; },
       gridSizeX: readonly(gridSizeX),
       gridSizeY: readonly(gridSizeY),
       zMaxTravel: readonly(zMaxTravel),

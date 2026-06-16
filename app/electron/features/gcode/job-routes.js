@@ -631,6 +631,49 @@ export class GCodeJobProcessor {
     try { this.progressProvider?.stop?.(); } catch {}
   }
 
+  async safeRetractAndStop(errorCode, errorMessage, failedLine, failedCommand) {
+    try {
+      await this.cncController.sendCommand('\x18', {
+        displayCommand: '\\x18 (Soft Reset — job error)',
+        meta: { jobControl: true, sourceId: 'system' }
+      });
+    } catch (e) {
+      log('Failed to send soft reset after job error:', e?.message || e);
+    }
+
+    // Wait for controller to process the reset
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    try {
+      const safeZ = getSetting('safeZHeight', -5);
+      const retractCmd = `G53 G0 Z${safeZ}`;
+      await this.cncController.sendCommand(retractCmd, {
+        displayCommand: `${retractCmd} (Safe retract — job error)`,
+        meta: { jobControl: true, sourceId: 'system' }
+      });
+    } catch (e) {
+      log('Failed to send safe retract after job error:', e?.message || e);
+    }
+
+    try {
+      await this.cncController.sendCommand('M5', {
+        displayCommand: 'M5 (Spindle off — job error)',
+        meta: { jobControl: true, sourceId: 'system' }
+      });
+    } catch (e) {
+      log('Failed to send spindle stop after job error:', e?.message || e);
+    }
+
+    this.broadcast('job-error', {
+      code: errorCode,
+      message: errorMessage,
+      line: failedLine,
+      command: failedCommand,
+      filename: this.filename,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   onComplete(callback) {
     this.completionCallbacks.push(callback);
   }
@@ -778,6 +821,15 @@ export class GCodeJobProcessor {
         } catch (error) {
           this.isStopped = true;
           this.isRunning = false;
+
+          const errorCode = error.code || null;
+          const errorMessage = error.message || 'Unknown error';
+          const failedLine = this.currentLineNumber;
+          const failedCommand = error.command || cleanLine;
+
+          log(`Job error on line ${failedLine}: [${errorCode}] ${errorMessage} — ${failedCommand}`);
+
+          await this.safeRetractAndStop(errorCode, errorMessage, failedLine, failedCommand);
           break;
         }
       }

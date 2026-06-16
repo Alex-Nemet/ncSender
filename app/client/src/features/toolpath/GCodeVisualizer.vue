@@ -309,6 +309,23 @@
         </div>
       </div>
 
+      <!-- Job error banner -->
+      <div class="job-error-warning" v-if="props.jobError">
+        <div class="job-error-body">
+          <svg class="warning-icon" width="64" height="64" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3.5c-.6 0-1.1.3-1.4.8L2.6 18.1c-.6 1 .1 2.4 1.4 2.4h16c1.3 0 2-1.3 1.4-2.4L13.4 4.3c-.3-.5-.8-.8-1.4-.8z" fill="#b84444" stroke="#b84444" stroke-width="1.5" stroke-linejoin="round"/>
+            <rect x="11" y="9.5" width="2" height="5.5" rx="1" fill="#ff8888"/>
+            <circle cx="12" cy="17" r="1.2" fill="#ff8888"/>
+          </svg>
+          <div class="job-error-right">
+            <span class="job-error-title">Job Stopped — Error {{ props.jobError.code }}</span>
+            <span class="job-error-detail">{{ props.jobError.message }}</span>
+            <span class="job-error-line">Line {{ props.jobError.line }}: {{ props.jobError.command }}</span>
+            <button class="job-error-dismiss-btn" @click="emit('dismiss-job-error')">Dismiss</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Out of bounds warning (only show when job is running, not in pre-run state) -->
       <div class="out-of-bounds-warning" v-if="showOutOfBoundsWarning && !showPreRunState">
         <svg class="warning-icon" width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -564,6 +581,7 @@ const props = withDefaults(defineProps<{
   spindleRpmTarget?: number;
   spindleRpmActual?: number;
   alarmMessage?: string;
+  jobError?: { code: number | null; message: string; line: number; command: string; filename: string } | null;
   currentTool?: number;
   toolLengthSet?: boolean;
 }>(), {
@@ -585,6 +603,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'change-view', value: 'top' | 'front' | 'iso' | 'split'): void;
+  (e: 'dismiss-job-error'): void;
 }>();
 
 const normalizedSenderStatus = computed(() => (props.senderStatus || '').toLowerCase());
@@ -4888,6 +4907,82 @@ body.theme-light .dot--rapid {
 }
 
 .alarm-unlock-btn:active {
+  transform: translateY(0);
+}
+
+/* Job error warning */
+.job-error-warning {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  backdrop-filter: blur(8px);
+  border: 2px solid #b84444;
+  color: #ff8888;
+  padding: 16px 24px;
+  border-radius: var(--radius-medium);
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 11;
+  max-width: 500px;
+}
+
+.job-error-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.job-error-body .warning-icon {
+  flex-shrink: 0;
+}
+
+.job-error-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.job-error-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ff8888;
+}
+
+.job-error-detail {
+  color: #ffaaaa;
+}
+
+.job-error-line {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #cc8888;
+  word-break: break-all;
+}
+
+.job-error-dismiss-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.job-error-dismiss-btn:hover {
+  background: #ff4444;
+  transform: translateY(-1px);
+}
+
+.job-error-dismiss-btn:active {
   transform: translateY(0);
 }
 
