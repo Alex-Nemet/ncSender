@@ -829,7 +829,19 @@ export class GCodeJobProcessor {
 
           log(`Job error on line ${failedLine}: [${errorCode}] ${errorMessage} — ${failedCommand}`);
 
-          await this.safeRetractAndStop(errorCode, errorMessage, failedLine, failedCommand);
+          if (errorCode === 'COMMAND_FLUSHED') {
+            log('Job stopped by user (queue flushed) — skipping safe retract');
+            this.broadcast('job-error', {
+              code: errorCode,
+              message: 'Job stopped by user',
+              line: failedLine,
+              command: failedCommand,
+              filename: this.filename,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            await this.safeRetractAndStop(errorCode, errorMessage, failedLine, failedCommand);
+          }
           break;
         }
       }
