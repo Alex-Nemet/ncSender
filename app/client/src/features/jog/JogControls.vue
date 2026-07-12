@@ -280,16 +280,14 @@ const continuousJog = async (axis: 'X' | 'Y' | 'Z', direction: 1 | -1) => {
 };
 
 const continuousDiagonalJog = async (xDirection: 1 | -1, yDirection: 1 | -1) => {
-  const xTravel = getAxisTravel('X');
-  const yTravel = getAxisTravel('Y');
+  const travel = Math.min(getAxisTravel('X'), getAxisTravel('Y'));
   const isImperial = unitsPreference.value === 'imperial';
   const unitsCode = isImperial ? 'G20' : 'G21';
-  const xTravelFormatted = formatStepForCommand(xTravel);
-  const yTravelFormatted = formatStepForCommand(yTravel);
+  const travelFormatted = formatStepForCommand(travel);
   const feedRateFormatted = formatFeedRateForCommand(props.feedRate);
   const xSign = xDirection > 0 ? '' : '-';
   const ySign = yDirection > 0 ? '' : '-';
-  const command = `$J=${unitsCode} G91 X${xSign}${xTravelFormatted} Y${ySign}${yTravelFormatted} F${feedRateFormatted}`;
+  const command = `$J=${unitsCode} G91 X${xSign}${travelFormatted} Y${ySign}${travelFormatted} F${feedRateFormatted}`;
   const jogId = createJogId();
   activeJogId = jogId;
   jogDebug('diagonal-continuous-start', `X${xSign}Y${ySign} jogId=${jogId} cmd=${command}`);
