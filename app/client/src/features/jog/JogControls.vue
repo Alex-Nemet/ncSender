@@ -25,36 +25,32 @@
         <button
           :class="['jog-btn', 'jog-corner', { pressed: isButtonPressed('diagonal--1-1') }]"
           aria-label="Jog X negative Y positive"
-          @mousedown="handleJogDiagonalStart(-1, 1, $event)"
-          @mouseup="handleJogDiagonalEnd(-1, 1, $event)"
-          @touchstart="handleJogDiagonalStart(-1, 1, $event)"
-          @touchend="handleJogDiagonalEnd(-1, 1, $event)"
+          @pointerdown="handleJogDiagonalStart(-1, 1, $event)"
+          @pointerup="handleJogDiagonalEnd(-1, 1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >↖</button>
         <button
           :class="['jog-btn', 'jog-axis', { pressed: isButtonPressed('Y-1') }]"
           aria-label="Jog Y positive"
-          @mousedown="handleJogStart('Y', 1, $event)"
-          @mouseup="handleJogEnd('Y', 1, $event)"
-          @touchstart="handleJogStart('Y', 1, $event)"
-          @touchend="handleJogEnd('Y', 1, $event)"
+          @pointerdown="handleJogStart('Y', 1, $event)"
+          @pointerup="handleJogEnd('Y', 1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >Y+</button>
         <button
           :class="['jog-btn', 'jog-corner', { pressed: isButtonPressed('diagonal-1-1') }]"
           aria-label="Jog X positive Y positive"
-          @mousedown="handleJogDiagonalStart(1, 1, $event)"
-          @mouseup="handleJogDiagonalEnd(1, 1, $event)"
-          @touchstart="handleJogDiagonalStart(1, 1, $event)"
-          @touchend="handleJogDiagonalEnd(1, 1, $event)"
+          @pointerdown="handleJogDiagonalStart(1, 1, $event)"
+          @pointerup="handleJogDiagonalEnd(1, 1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >↗</button>
 
         <!-- Middle Row -->
         <button
           :class="['jog-btn', 'jog-axis', { pressed: isButtonPressed('X--1') }]"
           aria-label="Jog X negative"
-          @mousedown="handleJogStart('X', -1, $event)"
-          @mouseup="handleJogEnd('X', -1, $event)"
-          @touchstart="handleJogStart('X', -1, $event)"
-          @touchend="handleJogEnd('X', -1, $event)"
+          @pointerdown="handleJogStart('X', -1, $event)"
+          @pointerup="handleJogEnd('X', -1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >X-</button>
         <button class="jog-center" @click="handleCenterClick" aria-label="Soft Reset" title="Stop / Soft Reset">
           <svg viewBox="0 0 24 24" fill="currentColor" class="stop-icon">
@@ -64,36 +60,32 @@
         <button
           :class="['jog-btn', 'jog-axis', { pressed: isButtonPressed('X-1') }]"
           aria-label="Jog X positive"
-          @mousedown="handleJogStart('X', 1, $event)"
-          @mouseup="handleJogEnd('X', 1, $event)"
-          @touchstart="handleJogStart('X', 1, $event)"
-          @touchend="handleJogEnd('X', 1, $event)"
+          @pointerdown="handleJogStart('X', 1, $event)"
+          @pointerup="handleJogEnd('X', 1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >X+</button>
 
         <!-- Bottom Row -->
         <button
           :class="['jog-btn', 'jog-corner', { pressed: isButtonPressed('diagonal--1--1') }]"
           aria-label="Jog X negative Y negative"
-          @mousedown="handleJogDiagonalStart(-1, -1, $event)"
-          @mouseup="handleJogDiagonalEnd(-1, -1, $event)"
-          @touchstart="handleJogDiagonalStart(-1, -1, $event)"
-          @touchend="handleJogDiagonalEnd(-1, -1, $event)"
+          @pointerdown="handleJogDiagonalStart(-1, -1, $event)"
+          @pointerup="handleJogDiagonalEnd(-1, -1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >↙</button>
         <button
           :class="['jog-btn', 'jog-axis', { pressed: isButtonPressed('Y--1') }]"
           aria-label="Jog Y negative"
-          @mousedown="handleJogStart('Y', -1, $event)"
-          @mouseup="handleJogEnd('Y', -1, $event)"
-          @touchstart="handleJogStart('Y', -1, $event)"
-          @touchend="handleJogEnd('Y', -1, $event)"
+          @pointerdown="handleJogStart('Y', -1, $event)"
+          @pointerup="handleJogEnd('Y', -1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >Y-</button>
         <button
           :class="['jog-btn', 'jog-corner', { pressed: isButtonPressed('diagonal-1--1') }]"
           aria-label="Jog X positive Y negative"
-          @mousedown="handleJogDiagonalStart(1, -1, $event)"
-          @mouseup="handleJogDiagonalEnd(1, -1, $event)"
-          @touchstart="handleJogDiagonalStart(1, -1, $event)"
-          @touchend="handleJogDiagonalEnd(1, -1, $event)"
+          @pointerdown="handleJogDiagonalStart(1, -1, $event)"
+          @pointerup="handleJogDiagonalEnd(1, -1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >↘</button>
       </div>
 
@@ -102,18 +94,16 @@
         <button
           :class="['jog-btn', 'jog-z-btn', { pressed: isButtonPressed('Z-1') }]"
           aria-label="Jog Z positive"
-          @mousedown="handleJogStart('Z', 1, $event)"
-          @mouseup="handleJogEnd('Z', 1, $event)"
-          @touchstart="handleJogStart('Z', 1, $event)"
-          @touchend="handleJogEnd('Z', 1, $event)"
+          @pointerdown="handleJogStart('Z', 1, $event)"
+          @pointerup="handleJogEnd('Z', 1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >Z+</button>
         <button
           :class="['jog-btn', 'jog-z-btn', { pressed: isButtonPressed('Z--1') }]"
           aria-label="Jog Z negative"
-          @mousedown="handleJogStart('Z', -1, $event)"
-          @mouseup="handleJogEnd('Z', -1, $event)"
-          @touchstart="handleJogStart('Z', -1, $event)"
-          @touchend="handleJogEnd('Z', -1, $event)"
+          @pointerdown="handleJogStart('Z', -1, $event)"
+          @pointerup="handleJogEnd('Z', -1, $event)"
+          @lostpointercapture="handleLostPointerCapture"
         >Z-</button>
       </div>
     </div>
@@ -122,7 +112,7 @@
 
 <script setup lang="ts">
 import { api, jogStart, jogStop, jogStep } from './api';
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useAppStore } from '@/composables/use-app-store';
 
 const props = withDefaults(defineProps<{
@@ -166,10 +156,12 @@ const handleCenterClick = async () => {
 let isLongPress = false;
 let activeJogId: string | null = null;
 let jogPressActive = false;
+let activePointerId: number | null = null;
 
 const handleGlobalRelease = () => {
   if (!jogPressActive) return;
   jogPressActive = false;
+  activePointerId = null;
 
   if (jogTimer) {
     clearTimeout(jogTimer);
@@ -179,6 +171,23 @@ const handleGlobalRelease = () => {
 
   if (isLongPress && activeJogId) {
     jogDebug('global-safety-release', `activeJogId=${activeJogId}`);
+    stopJog();
+  }
+};
+
+const handleLostPointerCapture = (event: PointerEvent) => {
+  if (event.pointerId !== activePointerId) return;
+  activePointerId = null;
+  jogPressActive = false;
+  pressedButtons.value.clear();
+
+  if (jogTimer) {
+    clearTimeout(jogTimer);
+    jogTimer = null;
+  }
+
+  if (isLongPress && activeJogId) {
+    jogDebug('lost-capture-safety', `activeJogId=${activeJogId}`);
     stopJog();
   }
 };
@@ -310,14 +319,13 @@ const continuousDiagonalJog = async (xDirection: 1 | -1, yDirection: 1 | -1) => 
   }
 };
 
-const handleJogStart = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event) => {
-  if (event) {
-    event.preventDefault();
-  }
+const handleJogStart = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event: PointerEvent) => {
+  event.preventDefault();
 
-  if (props.disabled) {
-    return;
-  }
+  if (props.disabled || activePointerId !== null) return;
+
+  activePointerId = event.pointerId;
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 
   jogPressActive = true;
   jogDebug('button-press', `${axis}${direction > 0 ? '+' : '-'}`);
@@ -331,14 +339,13 @@ const handleJogStart = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event)
   }, 300);
 };
 
-const handleJogDiagonalStart = (xDirection: 1 | -1, yDirection: 1 | -1, event?: Event) => {
-  if (event) {
-    event.preventDefault();
-  }
+const handleJogDiagonalStart = (xDirection: 1 | -1, yDirection: 1 | -1, event: PointerEvent) => {
+  event.preventDefault();
 
-  if (props.disabled) {
-    return;
-  }
+  if (props.disabled || activePointerId !== null) return;
+
+  activePointerId = event.pointerId;
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 
   jogPressActive = true;
   jogDebug('button-press', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'}`);
@@ -352,10 +359,12 @@ const handleJogDiagonalStart = (xDirection: 1 | -1, yDirection: 1 | -1, event?: 
   }, 300);
 };
 
-const handleJogEnd = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event) => {
-  if (event) {
-    event.preventDefault();
-  }
+const handleJogEnd = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event: PointerEvent) => {
+  event.preventDefault();
+
+  if (event.pointerId !== activePointerId) return;
+
+  activePointerId = null;
   jogPressActive = false;
   jogDebug('button-release', `${axis}${direction > 0 ? '+' : '-'} isLongPress=${isLongPress} activeJogId=${activeJogId}`);
   const buttonId = getButtonId(axis, direction);
@@ -372,10 +381,12 @@ const handleJogEnd = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event?: Event) =
   }
 };
 
-const handleJogDiagonalEnd = (xDirection: 1 | -1, yDirection: 1 | -1, event?: Event) => {
-  if (event) {
-    event.preventDefault();
-  }
+const handleJogDiagonalEnd = (xDirection: 1 | -1, yDirection: 1 | -1, event: PointerEvent) => {
+  event.preventDefault();
+
+  if (event.pointerId !== activePointerId) return;
+
+  activePointerId = null;
   jogPressActive = false;
   jogDebug('button-release', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'} isLongPress=${isLongPress} activeJogId=${activeJogId}`);
   const buttonId = getButtonId('', undefined, xDirection, yDirection);
@@ -443,6 +454,7 @@ let unsubscribeJogStopped: (() => void) | null = null;
 const handleWindowBlur = () => {
   if (activeJogId) {
     jogDebug('window-blur-safety', `activeJogId=${activeJogId}`);
+    activePointerId = null;
     jogPressActive = false;
     pressedButtons.value.clear();
     if (jogTimer) {
@@ -454,9 +466,8 @@ const handleWindowBlur = () => {
 };
 
 onMounted(() => {
-  document.addEventListener('mouseup', handleGlobalRelease);
-  document.addEventListener('touchend', handleGlobalRelease);
-  document.addEventListener('touchcancel', handleGlobalRelease);
+  document.addEventListener('pointerup', handleGlobalRelease);
+  document.addEventListener('pointercancel', handleGlobalRelease);
   window.addEventListener('blur', handleWindowBlur);
 
   unsubscribeJogStopped = api.on('jog:stopped', (data) => {
@@ -470,10 +481,19 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener('mouseup', handleGlobalRelease);
-  document.removeEventListener('touchend', handleGlobalRelease);
-  document.removeEventListener('touchcancel', handleGlobalRelease);
+  document.removeEventListener('pointerup', handleGlobalRelease);
+  document.removeEventListener('pointercancel', handleGlobalRelease);
   window.removeEventListener('blur', handleWindowBlur);
+
+  if (jogTimer) {
+    clearTimeout(jogTimer);
+    jogTimer = null;
+  }
+
+  if (activeJogId) {
+    jogDebug('unmount-safety', `activeJogId=${activeJogId}`);
+    stopJog();
+  }
 
   if (unsubscribeJogStopped) {
     unsubscribeJogStopped();
@@ -574,7 +594,7 @@ onBeforeUnmount(() => {
   user-select: none;
   color: var(--color-text-primary) !important;
   -webkit-touch-callout: default;
-  touch-action: manipulation;
+  touch-action: none;
   padding: unset !important;
 }
 
@@ -620,7 +640,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   user-select: none;
   -webkit-touch-callout: default;
-  touch-action: manipulation;
+  touch-action: none;
   padding: unset !important;
 }
 
