@@ -6,17 +6,17 @@ It's meant as a reference for discussing changes with Francis (upstream author).
 ---
 
 ## Runaway Jog — Lost Button Release Events
-**Status:** Fixed (2026-06-16)
-**Commit:** pending
+**Status:** Fixed (2026-08-13, pointer capture)
+**Commit:** 560981e
 **Files:** `app/client/src/features/jog/JogControls.vue`
 
-**Problem:** Continuous jog could run away if the mouse/finger moved off the jog button before releasing. The `mouseup`/`touchend` event would fire on a different element, so the button's release handler never ran and `stopJog()` was never called. The machine would keep jogging the full axis travel distance until hitting a limit or the user found another way to cancel.
+**Problem:** Continuous jog could run away if the mouse/finger moved off the jog button before releasing. The original fix (2026-06-16) added document-level `mouseup`/`touchend` listeners, but the release event could still be lost — something between the button and the document swallowed it. The user had to hit the stop button or an opposite direction button to cancel the runaway.
 
-**Root cause:** Each jog button only listened for release events on itself — no global safety net existed for missed releases.
+**Root cause:** `mouseup` events fire on whatever element the cursor is over, and can be intercepted or lost before reaching the document-level safety handler. Additionally, the shared `isLongPress` flag could be reset by a stray second press on another button, causing the release handler to send a step jog instead of cancelling.
 
-**Fix:** Added document-level `mouseup`/`touchend`/`touchcancel` listeners that catch any pointer release and cancel the active jog. Also added a `window.blur` handler to cancel jogs if the window loses focus. Since all jog surfaces (main panel, probe dialog, mobile view, plugin web components) use the same `JogControls.vue` component, the fix applies everywhere.
+**Fix:** Switched from `mousedown`/`mouseup`/`touchstart`/`touchend` to Pointer Events with `setPointerCapture()`. Once a button captures the pointer, the `pointerup` event always fires on that same button regardless of where the cursor goes — it cannot be lost or intercepted. Also tracks `activePointerId` to ignore stray second presses, added `lostpointercapture` as a safety net, and cancels active jogs on component unmount.
 
-**Evidence:** Log from 2026-06-09 shows `button-press Z-` with no matching `button-release Z-` — the release logged as `button-release Z+` (user pressed opposite button to fight the runaway).
+**Evidence:** Logs from 2026-08-07 (Z axis) and 2026-08-13 (X axis) both show cross-button releases (press X-, release X+; press Z-, release Z+) — user hitting opposite button to stop runaways that the document-level handler failed to catch.
 
 ---
 
