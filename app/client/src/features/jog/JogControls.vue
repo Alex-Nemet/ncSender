@@ -158,7 +158,9 @@ let activeJogId: string | null = null;
 let jogPressActive = false;
 let activePointerId: number | null = null;
 
-const handleGlobalRelease = () => {
+const handleGlobalRelease = (rawEvent?: Event) => {
+  const pe = rawEvent instanceof PointerEvent ? rawEvent : null;
+  jogDebug('raw-global-release', `eventType=${rawEvent?.type} pointerId=${pe?.pointerId} pointerType=${pe?.pointerType} jogActive=${jogPressActive} activePtr=${activePointerId} isLong=${isLongPress} jogId=${activeJogId}`);
   if (!jogPressActive) return;
   jogPressActive = false;
   activePointerId = null;
@@ -176,6 +178,7 @@ const handleGlobalRelease = () => {
 };
 
 const handleLostPointerCapture = (event: PointerEvent) => {
+  jogDebug('raw-lostpointercapture', `pointerId=${event.pointerId} activePtr=${activePointerId} jogActive=${jogPressActive} isLong=${isLongPress} jogId=${activeJogId}`);
   if (event.pointerId !== activePointerId) return;
   activePointerId = null;
   jogPressActive = false;
@@ -195,6 +198,12 @@ const handleLostPointerCapture = (event: PointerEvent) => {
 const jogDebug = (event: string, detail?: string) => {
   console.log(`[JogDebug] ${event}${detail ? ': ' + detail : ''} t=${Date.now()}`);
   api.sendWebSocketMessage('jog:debug', { event, detail }).catch(() => {});
+};
+
+const pointerDetail = (event: PointerEvent) => {
+  const el = event.currentTarget as HTMLElement | null;
+  const hasCapture = el ? el.hasPointerCapture(event.pointerId) : '?';
+  return `type=${event.pointerType} pointerId=${event.pointerId} button=${event.button} buttons=${event.buttons} capture=${hasCapture} activePtr=${activePointerId} jogActive=${jogPressActive}`;
 };
 
 const createJogId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -321,8 +330,13 @@ const continuousDiagonalJog = async (xDirection: 1 | -1, yDirection: 1 | -1) => 
 
 const handleJogStart = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event: PointerEvent) => {
   event.preventDefault();
+  const pd = pointerDetail(event);
+  jogDebug('raw-pointerdown', `${axis}${direction > 0 ? '+' : '-'} ${pd}`);
 
-  if (props.disabled || activePointerId !== null) return;
+  if (props.disabled || activePointerId !== null) {
+    jogDebug('pointerdown-blocked', `disabled=${props.disabled} activePtr=${activePointerId} ${pd}`);
+    return;
+  }
 
   activePointerId = event.pointerId;
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -341,8 +355,13 @@ const handleJogStart = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event: Pointer
 
 const handleJogDiagonalStart = (xDirection: 1 | -1, yDirection: 1 | -1, event: PointerEvent) => {
   event.preventDefault();
+  const pd = pointerDetail(event);
+  jogDebug('raw-pointerdown', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'} ${pd}`);
 
-  if (props.disabled || activePointerId !== null) return;
+  if (props.disabled || activePointerId !== null) {
+    jogDebug('pointerdown-blocked', `disabled=${props.disabled} activePtr=${activePointerId} ${pd}`);
+    return;
+  }
 
   activePointerId = event.pointerId;
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
@@ -361,8 +380,13 @@ const handleJogDiagonalStart = (xDirection: 1 | -1, yDirection: 1 | -1, event: P
 
 const handleJogEnd = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event: PointerEvent) => {
   event.preventDefault();
+  const pd = pointerDetail(event);
+  jogDebug('raw-pointerup', `${axis}${direction > 0 ? '+' : '-'} ${pd}`);
 
-  if (event.pointerId !== activePointerId) return;
+  if (event.pointerId !== activePointerId) {
+    jogDebug('pointerup-ignored', `pointerId=${event.pointerId} !== activePtr=${activePointerId} ${pd}`);
+    return;
+  }
 
   activePointerId = null;
   jogPressActive = false;
@@ -383,8 +407,13 @@ const handleJogEnd = (axis: 'X' | 'Y' | 'Z', direction: 1 | -1, event: PointerEv
 
 const handleJogDiagonalEnd = (xDirection: 1 | -1, yDirection: 1 | -1, event: PointerEvent) => {
   event.preventDefault();
+  const pd = pointerDetail(event);
+  jogDebug('raw-pointerup', `diagonal X${xDirection > 0 ? '+' : '-'}Y${yDirection > 0 ? '+' : '-'} ${pd}`);
 
-  if (event.pointerId !== activePointerId) return;
+  if (event.pointerId !== activePointerId) {
+    jogDebug('pointerup-ignored', `pointerId=${event.pointerId} !== activePtr=${activePointerId} ${pd}`);
+    return;
+  }
 
   activePointerId = null;
   jogPressActive = false;
