@@ -37,7 +37,21 @@
         </span>
       </div>
       <div class="workspace-selector">
-        <label class="workspace-label" for="workspace-select">Workspace:</label>
+        <label class="workspace-label" for="workspace-set-select">Workspace:</label>
+        <select
+          id="workspace-set-select"
+          class="workspace-select workspace-set-select"
+          :value="activeWorkspaceId || ''"
+          @change="onWorkspaceSetChange($event)"
+          title="Named set of work offsets"
+        >
+          <option value="">— none —</option>
+          <option v-for="w in workspaceSets" :key="w.id" :value="w.id">{{ w.name }}</option>
+          <option value="__manage">Manage…</option>
+        </select>
+      </div>
+      <div class="workspace-selector">
+        <label class="workspace-label" for="workspace-select">WCS:</label>
         <select
           id="workspace-select"
           class="workspace-select"
@@ -195,12 +209,16 @@ const props = defineProps<{
   updateState?: TopToolbarUpdateState;
   pendantConnectionType?: 'wifi' | 'bluetooth' | null;
   showPendant?: boolean;
+  workspaceSets?: Array<{ id: string; name: string }>;
+  activeWorkspaceId?: string | null;
 }>();
 
 const emit = defineEmits<{
   (e: 'toggle-theme'): void;
   (e: 'unlock'): void;
   (e: 'change-workspace', value: string): void;
+  (e: 'change-workspace-set', id: string): void;
+  (e: 'manage-workspaces'): void;
   (e: 'show-update-dialog'): void;
   (e: 'show-bluetooth'): void;
 }>();
@@ -397,6 +415,21 @@ const onVersionClick = () => {
   }
 };
 
+const workspaceSets = computed(() => props.workspaceSets ?? []);
+const activeWorkspaceId = computed(() => props.activeWorkspaceId ?? null);
+
+// "Manage…" is an action rather than a selection, so it never becomes the value.
+const onWorkspaceSetChange = (e: Event) => {
+  const target = e.target as HTMLSelectElement | null;
+  const value = target?.value || '';
+  if (value === '__manage') {
+    if (target) target.value = activeWorkspaceId.value || '';
+    emit('manage-workspaces');
+    return;
+  }
+  emit('change-workspace-set', value);
+};
+
 const onWorkspaceChange = (e: Event) => {
   const target = e.target as HTMLSelectElement | null;
   const value = (target?.value || '').toUpperCase();
@@ -501,6 +534,11 @@ const onWorkspaceChange = (e: Event) => {
 .workspace-label {
   color: var(--color-text-secondary);
   font-size: 0.9rem;
+}
+
+.workspace-set-select {
+  min-width: 150px;
+  max-width: 220px;
 }
 
 .workspace-select {

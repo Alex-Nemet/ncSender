@@ -52,7 +52,11 @@
         :show-pendant="showPendant"
         @toggle-theme="toggleTheme"
         @unlock="handleUnlock"
+        :workspace-sets="workspaceSets"
+        :active-workspace-id="activeWorkspaceId"
         @change-workspace="handleWorkspaceChange"
+        @change-workspace-set="handleWorkspaceSetChange"
+        @manage-workspaces="showWorkspacesDialog = true"
         @show-update-dialog="openUpdateDialog"
         @show-bluetooth="showPendantDialog = true"
         :on-show-settings="openSettings"
@@ -865,6 +869,11 @@
     @close="showPendantDialog = false"
   />
 
+  <WorkspacesDialog
+    :is-open="showWorkspacesDialog"
+    @close="showWorkspacesDialog = false"
+  />
+
     <!-- Plugin Dialog -->
     <PluginDialog />
 
@@ -993,6 +1002,8 @@
 import { computed, reactive, ref, watch, watchEffect, onMounted, onUnmounted, nextTick } from 'vue';
 import AppShell from './shell/AppShell.vue';
 import TopToolbar from './shell/TopToolbar.vue';
+import WorkspacesDialog from './features/workspaces/WorkspacesDialog.vue';
+import { useWorkspaces } from './features/workspaces/useWorkspaces';
 import GCodeVisualizer from './features/toolpath/GCodeVisualizer.vue';
 import RightPanel from './shell/RightPanel.vue';
 import MobileView from './features/mobile/MobileView.vue';
@@ -1302,6 +1313,20 @@ const { jogConfig } = store;
 const fetchAlarmDescription = store.setLastAlarmCode;
 
 // Handle workspace change from toolbar
+const showWorkspacesDialog = ref(false);
+const workspacesStore = useWorkspaces();
+const workspaceSets = computed(() => workspacesStore.workspaces.value.map(w => ({ id: w.id, name: w.name })));
+const activeWorkspaceId = computed(() => workspacesStore.activeId.value);
+
+// Selecting a set from the toolbar opens the dialog rather than writing offsets
+// straight away: loading clears every slot the workspace does not define, which
+// is never something to do on one click without seeing what changes.
+const handleWorkspaceSetChange = (id: string) => {
+  if (!id) return;
+  workspacesStore.activeId.value = id;
+  showWorkspacesDialog.value = true;
+};
+
 const handleWorkspaceChange = async (newWorkspace: string) => {
   try {
     // Optimistically update UI; server will confirm via status update
@@ -2764,6 +2789,9 @@ const pollBluetoothStatus = async () => {
 };
 
 onMounted(async () => {
+  // The toolbar needs the workspace names before anything is clicked.
+  workspacesStore.load().catch(() => {});
+
   // Start polling Bluetooth status (only polls when showPendant is enabled)
   pollBluetoothStatus();
   bluetoothPollInterval = setInterval(pollBluetoothStatus, 5000);

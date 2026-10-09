@@ -37,6 +37,10 @@ const DEFAULT_SETTINGS = {
   },
   theme: 'dark',
   workspace: 'G54',
+  // Named sets of work-offset positions, loaded into G54-G59 on demand.
+  // The six slots are scratch space; these are the real storage.
+  workspaces: [],
+  activeWorkspaceId: null,
   defaultGcodeView: 'top',
   autoFit : false,
   accentColor: '#1abc9c',
