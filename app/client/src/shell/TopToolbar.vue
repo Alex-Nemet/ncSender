@@ -427,6 +427,7 @@ const onWorkspaceSetChange = (e: Event) => {
     emit('manage-workspaces');
     return;
   }
+  if (target) target.value = activeWorkspaceId.value || '';
   emit('change-workspace-set', value);
 };
 

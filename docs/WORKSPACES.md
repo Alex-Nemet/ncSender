@@ -1,150 +1,94 @@
 # Workspaces — named sets of work offsets
 
-Branch: `feature/workspaces` · Written 2026-10-09 · **Status: does not work yet, see "Current bug"**
+Branch: `feature/workspaces` · Updated 2026-10-09
 
-## The problem
+## Intended behavior
 
-grblHAL gives six work coordinate systems, G54–G59 (plus G59.1–.3). They fill up.
-On this machine all six are in use and there is no record of what most of them are
-for, so reusing a slot destroys a position that may have taken real setup time to
-establish.
+A workspace saves **X, Y and Z** work offsets for G54–G59. Loading it restores
+those saved values, just as each controller WCS remembers its own XYZ zero.
+The user may touch off Z normally, then re-save the slot to remember its new value.
+This supersedes the original XY-only design.
 
-More slots is not the fix. The fix is to stop treating the slots as storage: keep a
-named library of positions in the app and **load** them into whichever slots are
-needed for the job at hand. The six slots become scratch space.
+Tool length compensation, G92, machine settings, and physical machine position
+are separate from the saved work offsets. Capture uses `$#`, never status `WCO`,
+which includes G92 and tool length compensation. The measured G54 Z was 23.324 mm,
+TLO was −60.955 mm, and WCO Z was −37.631 mm: saving WCO would mix them together.
 
-A "Workspace" is a named set of positions, e.g. *Top of neck operations* =
-{ G54 → blank A, G55 → blank B }.
+## First Windows machine test
 
-### What this unlocks
+1. Close the existing ncSender before starting the preview build.
+2. Open **Workspace → Manage…**. Use **Capture all six from machine**, named
+   **Default**, before any load is available. This only reads/saves offsets.
+   Check the saved XYZ values against the controller's current values.
+3. Verify Default; it should match. Keep the external offset backup too.
+4. **Create empty** creates a saved workspace without changing the machine.
+5. **Load onto machine** previews all six before/after XYZ values. Only confirming
+   **Write offsets** writes them. Loading an empty workspace sets all six to XYZ zero.
+6. Without running a job, load Default and verify that all original XYZ values return.
+7. For a new setup, set each WCS normally, then **Save current G54**, etc.
+   After adjusting Z, **Re-save** that slot before switching away.
 
-The motivating job is cutting two (or more) banjo necks in one run. Blank A on G54,
-blank B on G55, each with its **own Z** touched off because the two blanks differ in
-thickness. The G-code generator then emits each operation once per blank with only
-the WCS word changed (`G54` → `G55`), never recomputing a coordinate.
+Saving is explicit, not automatic. Selecting a workspace opens the dialog; only
+an acknowledged and verified load marks it active. Loading offsets commands no
+motion. Zeroed slots are **not** a general safety mechanism; do not run a job
+against a slot that has not been set up.
 
-## Verified machine facts
+## Implementation rules
 
-All measured on the real machine (grblHAL, 192.168.50.114) on 2026-10-09.
+- Capture all preserves all six slots, including all-zero and Z-only offsets.
+- Loads write saved XYZ. Slots absent from a workspace are cleared in all three axes.
+- Clear edits the saved workspace; the machine changes only on confirmed load.
+- Old XY-only slots must be re-saved from the intended setup before loading.
+  Missing Z is never guessed or replaced with zero.
+- `$#` and `$G` reads await controller acknowledgement and require complete replies.
+  G59.1–.3 are outside this feature's scope. Partial reports cannot silently clear slots.
+- G92 must be zero for capture/load because its separate temporary shift is not saved.
+- The machine must be idle with no running/paused job. Each write is acknowledged.
+  A failure may leave partially changed offsets; no workspace is marked loaded.
+- Prior units/distance modes come from `$G` and are restored even after a write failure.
+- Read-back verification includes Z, cleared slots, and missing slots.
+- Saved numbers assume this machine's `$13=0` millimetre reporting.
+- A workspace label is not live proof of matching offsets after outside edits.
+  Use Verify and re-save adjusted offsets as needed.
 
-```
-$20 soft limits = 1        $21 hard limits = 1
-X travel 1260 mm   Y travel 1248 mm   Z travel 170 mm
-$13 report inches = 0      -> the controller reports millimetres
-```
+## Confirmed startup bug
 
-Work offsets as found (mm, from `$#`):
+`useWorkspaces.ts` returned `workspaces`, `activeId`, `busy`, and `error` without
+any declarations. `App.vue` calls it during setup, causing a ReferenceError and
+preventing mounting. Shared module-level Vue refs now exist. Tests instantiate
+the composable and confirm callers share the same state.
 
-```
-G54   979.418  -731.266   23.324
-G55   672.831 -1141.713   27.725
-G56   214.999  -414.998  -45.010
-G57   429.932 -1133.189  -45.103
-G58   557.886  -797.533  -45.012
-G59    36.718  -827.244  -45.294
-G59.1 / .2 / .3   all zero (free)
-G92   0,0,0        TLO  0,0,-60.955
-```
+The older handoff also reported `/api/init` hanging in a local standalone Node
+process. The init route has no diff against main. An isolated server using temporary
+settings, disabled CNC auto-connect and `UV_THREADPOOL_SIZE=16` returned the full
+init payload without a controller. The exact cause of the older process's hang
+remains unproven and is separate from the confirmed missing-ref defect.
 
-Three findings that drove the design:
+## Files
 
-1. **`G10 L2` with no Z word leaves the stored Z untouched.** Proven: G54 was moved
-   2″ left and restored; its Z held at 23.324 throughout.
-2. **The status report's `WCO` is not the work offset.** `WCO = offset + G92 + TLO`.
-   Here G54 Z 23.324 + TLO −60.955 = WCO Z −37.631. Capturing Z from `WCO` would
-   write a 2.4″ error. X and Y happen to be clean only because TLO and G92 are zero
-   there — so a capture must be refused while G92 is non-zero.
-3. **Zero is the right value for an unused slot.** Machine Y runs 0 → −1248, and
-   programs cut at positive work-Y, so a program run against a zeroed slot leaves the
-   envelope and trips soft limits *before moving*. A slot parked somewhere "safe"
-   would run instead of alarm. This depends on the machine being homed.
+- `app/client/src/features/workspaces/workspaces.ts`: XYZ data, complete-report
+  validation, G10 generation, modal parsing, verification.
+- `app/client/src/features/workspaces/useWorkspaces.ts`: shared state, persistence,
+  capture, acknowledged loading and read-back verification.
+- `app/client/src/features/workspaces/WorkspacesDialog.vue`: XYZ table and load preview.
+- `app/electron/features/workspaces/routes.js`: `$#` / `$G` collection and timeouts.
+- `App.vue` / `TopToolbar.vue`: requested selection stays separate from loaded identity.
+- `app/client/tests/workspaces.test.mjs`: simulated controller and route regressions.
+- `.github/workflows/workspace-preview.yml`: Windows preview artifact build on this
+  branch; no stable release or version tag is created.
 
-## Design rules
+## Validation and remaining work
 
-| rule | why |
-| --- | --- |
-| Loading writes **X and Y only**, never Z | Z is a property of the stock, not the fixture; it is touched off per blank. This is what lets two blanks of different thickness run together. |
-| Capture reads **`$#`**, never `WCO` | `WCO` is contaminated by TLO (finding 2). |
-| Capture is refused while **G92 ≠ 0** | G92 shifts the reported offsets, corrupting X and Y too. |
-| **Clearing** a slot writes `X0 Y0 Z0` | Clearing declares a slot meaningless, so stale Z goes too. Distinct from loading, which never touches Z. |
-| Loading **clears every slot the workspace does not define** | No stale position left pretending to be meaningful. |
-| Nothing can be loaded until a workspace has been captured | Because of the rule above, a first load would otherwise wipe real positions. |
-| Loading shows a **before/after confirmation** listing every slot that changes | Overwriting several offsets must never be a single silent click. |
-| **Verify** re-reads `$#` and compares to what the workspace claims | "Am I in the right workspace?" needs a check against reality, not a label. |
+`node --test app/client/tests/workspaces.test.mjs` passes eleven tests: XYZ
+capture/persistence/restore, Z re-save, zero/Z-only offsets, legacy XY rejection,
+partial reads, rejected commands, mode restoration, verification failure,
+idle/G92 guards, clearing and listener cleanup. `npm run build:client` in `app` passes.
 
-## Implementation
+The real Windows UI and physical-controller round trip still need the user's
+machine test. Local interactive inspection was unavailable because computer-use
+permissions were not granted. No real controller offsets were written in this session.
 
-| file | role |
-| --- | --- |
-| `app/client/src/features/workspaces/workspaces.ts` | Pure logic: parse `$#`, build the `G10 L2` program, verify. No I/O. |
-| `app/client/src/features/workspaces/useWorkspaces.ts` | Composable: settings persistence, capture, apply, verify. Module-level refs so the toolbar and dialog share one copy. |
-| `app/client/src/features/workspaces/WorkspacesDialog.vue` | The management UI. |
-| `app/electron/features/workspaces/routes.js` | `GET /api/work-offsets` — sends `$#`, collects the reply. |
-| `app/electron/core/settings-manager.js` | `workspaces: []`, `activeWorkspaceId: null` added to `DEFAULT_SETTINGS`. |
-| `app/client/src/shell/TopToolbar.vue` | New **Workspace** dropdown; the existing G54–G59 selector relabelled **WCS**. |
-| `app/client/src/App.vue` | Wiring + dialog mount. |
+## External backup from the previous session
 
-Naming: **Workspace** = the named set. **WCS** = a G54–G59 slot. The existing
-toolbar selector was relabelled accordingly.
-
-### Why the server reads `$#`
-
-`$#` has no reply route and its answer is not part of the status report. An earlier
-attempt read it in the browser from the `cnc-data` websocket broadcast; that can
-never work, because `cnc-data` is only emitted for `?` status polls
-(`app/electron/server/websocket.js`). The controller emits each bracketed reply on
-its own `data` event, which is how `features/firmware/routes.js` already collects
-its responses. The workspaces route does the same and ends the report on `[PRB:`.
-
-## Current bug — unresolved
-
-**After installing the branch build, ncSender opens to a blank window.** Title bar
-renders, page body is empty.
-
-Confirmed:
-
-- `#app` has **zero children**; `__vue_app__` is absent — Vue never mounts.
-- **No JavaScript exception** is thrown (checked over CDP with `Runtime.enable` and
-  `Log.enable` before navigation).
-- `main.ts` does `await loadInitData()` **before** `app.mount('#app')`, so anything
-  that hangs there produces exactly this symptom: blank page, no error.
-- Locally, **`GET /api/init` never returns** while `GET /api/settings` returns 200
-  from the same running server. This is the prime suspect.
-- The new `GET /api/work-offsets` route works correctly — returns a clean
-  `503 {"error":"Could not send $#: CNC controller is not connected"}` when there is
-  no controller.
-- `app/client/public/sw.js` is a **no-op service worker** (a fetch listener that
-  never calls `respondWith`) and predates this branch, so the "fetch event handler"
-  message in DevTools is probably benign.
-
-Not yet established:
-
-- Whether `/api/init` hangs **because of this branch** or because the local test
-  machine has no controller attached. `/api/init` awaits
-  `Promise.all([readSettings(), readMacros(), tryReadFirmwareFile(), getAllTools()])`
-  — `getAllTools()` has a `.catch`, but `tryReadFirmwareFile()` does not obviously
-  time out. **A baseline build of `main` has not been tested in the same harness**,
-  so the local reproduction may not be the user's bug at all.
-
-### The next step
-
-Build `main` unchanged, serve it, and request `/api/init`. If it also hangs with no
-controller attached, the local symptom is environmental and the real fault is
-elsewhere — get the error from the installed build's DevTools console instead. If
-`main` returns and this branch does not, diff the settings path: the only server
-change here is two new keys in `DEFAULT_SETTINGS` plus the new route registration in
-`app/electron/server/http.js`.
-
-## What is and is not proven
-
-**Proven:** the `$#` parse and the `G10 L2` generation, tested against the real
-report above — six slots, exact values, G59.1–.3 correctly excluded, G92 detection.
-The `G10 L2`-leaves-Z-alone behaviour, on the machine.
-
-**Not proven:** anything in the UI. It has never been clicked, has never written an
-offset to a controller, and currently prevents the app from starting at all.
-
-## Safety net
-
-`wcs-backups/offsets-2026-10-09.md` in the `ncSender-plugins` repo holds all six
-positions and a paste-ready restore script.
+`wcs-backups/offsets-2026-10-09.md` in the `ncSender-plugins` repository contains the
+six original positions and a paste-ready restore script.

@@ -1,0 +1,34 @@
+name: Windows Workspace Preview
+
+on:
+  push:
+    branches: [feature/workspaces]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install app dependencies
+        run: npm ci
+        working-directory: app
+      - name: Install client dependencies
+        run: npm ci
+        working-directory: app/client
+      - name: Test workspace capture and restore
+        run: node --test app/client/tests/workspaces.test.mjs
+      - name: Build Windows preview
+        run: npm run dist -- --win --x64 --publish never
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ncSender-Windows-Workspaces
+          path: app/dist-electron/*.exe
+          if-no-files-found: error

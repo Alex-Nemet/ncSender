@@ -26,7 +26,7 @@
         <template v-else>
           <div class="ws-row">
             <label class="ws-label" for="ws-pick">Workspace</label>
-            <select id="ws-pick" class="ws-select" v-model="selectedId">
+            <select id="ws-pick" class="ws-select" v-model="selectedId" :disabled="busy || !!pending">
               <option v-for="w in workspaces" :key="w.id" :value="w.id">{{ w.name }}</option>
             </select>
             <button class="ws-btn" type="button" :disabled="busy || !selected" @click="doApply">Load onto machine</button>
@@ -34,23 +34,24 @@
           </div>
 
           <table v-if="selected" class="ws-table">
-            <thead><tr><th>WCS</th><th>X mm</th><th>Y mm</th><th>Saved</th><th></th></tr></thead>
+            <thead><tr><th>WCS</th><th>X mm</th><th>Y mm</th><th>Z mm</th><th>Saved</th><th></th></tr></thead>
             <tbody>
               <tr v-for="slot in SLOTS" :key="slot" :class="{ unset: !selected.slots[slot] }">
                 <td class="mono">{{ slot }}</td>
                 <template v-if="selected.slots[slot]">
                   <td class="mono">{{ selected.slots[slot].x.toFixed(3) }}</td>
                   <td class="mono">{{ selected.slots[slot].y.toFixed(3) }}</td>
+                  <td class="mono">{{ selected.slots[slot].z?.toFixed(3) ?? 'Re-save required' }}</td>
                   <td class="when">{{ when(selected.slots[slot].savedAt) }}</td>
                   <td class="ws-actions">
-                    <button class="ws-btn small" type="button" :disabled="busy" @click="doSaveSlot(slot)">Re-save</button>
-                    <button class="ws-btn small" type="button" :disabled="busy" @click="doClearSlot(slot)">Clear</button>
+                    <button class="ws-btn small" type="button" :disabled="busy || !!pending" @click="doSaveSlot(slot)">Re-save</button>
+                    <button class="ws-btn small" type="button" :disabled="busy || !!pending" @click="doClearSlot(slot)">Clear</button>
                   </td>
                 </template>
                 <template v-else>
-                  <td colspan="3" class="muted">— not set — <span class="hint">cleared to zero when loaded</span></td>
+                  <td colspan="4" class="muted">— not set — <span class="hint">cleared to zero when loaded</span></td>
                   <td class="ws-actions">
-                    <button class="ws-btn small" type="button" :disabled="busy" @click="doSaveSlot(slot)">
+                    <button class="ws-btn small" type="button" :disabled="busy || !!pending" @click="doSaveSlot(slot)">
                       Save current {{ slot }}
                     </button>
                   </td>
@@ -60,7 +61,7 @@
           </table>
 
           <p class="ws-note">
-            Loading writes <strong>X and Y only</strong>. Z is never written — touch it off per blank.
+            Loading restores <strong>X, Y and Z</strong> for every WCS. You can touch off Z again, then re-save the slot to remember it.
           </p>
 
           <div class="ws-row ws-new">
@@ -75,16 +76,16 @@
         <div v-if="pending" class="ws-confirm">
           <h3>Load “{{ pending.name }}” onto the machine?</h3>
           <table class="ws-table">
-            <thead><tr><th>WCS</th><th>now</th><th>becomes</th></tr></thead>
+            <thead><tr><th>WCS</th><th>Now: X, Y, Z (mm)</th><th>Becomes: X, Y, Z (mm)</th></tr></thead>
             <tbody>
               <tr v-for="row in pendingRows" :key="row.slot" :class="{ clearing: !row.to }">
                 <td class="mono">{{ row.slot }}</td>
                 <td class="mono muted">{{ row.from }}</td>
-                <td class="mono">{{ row.to ? `${row.to.x.toFixed(3)}, ${row.to.y.toFixed(3)}` : 'cleared to 0' }}</td>
+                <td class="mono">{{ row.to ? `${row.to.x.toFixed(3)}, ${row.to.y.toFixed(3)}, ${row.to.z.toFixed(3)}` : 'cleared to 0' }}</td>
               </tr>
             </tbody>
           </table>
-          <p class="ws-warn" v-if="pendingRows.some(r => !r.to && r.from !== '0.000, 0.000')">
+          <p class="ws-warn" v-if="pendingRows.some(r => !r.to && r.from !== '0.000, 0.000, 0.000')">
             Slots shown as cleared currently hold a position. It will be lost unless it is saved in another workspace.
           </p>
           <div class="ws-row">
@@ -108,10 +109,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { WCS_SLOTS, type WcsSlot, type Workspace, parseOffsetReport, buildLoadProgram } from './workspaces';
+import { WCS_SLOTS, type WcsSlot, type Workspace, requireCompleteReport, buildLoadProgram } from './workspaces';
 import { useWorkspaces, readOffsetReport } from './useWorkspaces';
 
-const props = defineProps<{ isOpen: boolean }>();
+const props = defineProps<{ isOpen: boolean; initialWorkspaceId?: string | null }>();
 defineEmits<{ (e: 'close'): void }>();
 
 const SLOTS = WCS_SLOTS;
@@ -131,12 +132,13 @@ watch(() => props.isOpen, async open => {
   error.value = ''; verifyResult.value = null; pending.value = null;
   try {
     await ws.load();
-    selectedId.value = ws.activeId.value ?? workspaces.value[0]?.id ?? null;
+    selectedId.value = props.initialWorkspaceId ?? ws.activeId.value ?? workspaces.value[0]?.id ?? null;
   } catch (e: any) { error.value = e?.message || String(e); }
 }, { immediate: true });
 
 const run = async (fn: () => Promise<void>) => {
-  busy.value = true; error.value = '';
+  if (busy.value) return;
+  busy.value = true; error.value = ''; verifyResult.value = null;
   try { await fn(); } catch (e: any) { error.value = e?.message || String(e); }
   finally { busy.value = false; }
 };
@@ -158,6 +160,7 @@ const doClearSlot = (slot: WcsSlot) => run(async () => { if (selected.value) awa
 const doDelete = () => run(async () => {
   if (!selected.value) return;
   if (!confirm(`Delete workspace “${selected.value.name}”? The machine's offsets are not changed.`)) return;
+  if (ws.activeId.value === selected.value.id) ws.activeId.value = null;
   workspaces.value = workspaces.value.filter(w => w.id !== selected.value!.id);
   await ws.persist();
   selectedId.value = workspaces.value[0]?.id ?? null;
@@ -166,19 +169,18 @@ const doDelete = () => run(async () => {
 // Read the machine first so the confirmation shows real before/after values.
 const doApply = () => run(async () => {
   if (!selected.value) return;
-  const live = parseOffsetReport(await readOffsetReport());
+  const live = requireCompleteReport(await readOffsetReport());
   pendingRows.value = buildLoadProgram(selected.value).map(l => ({
     slot: l.slot, to: l.to,
-    from: live[l.slot] ? `${live[l.slot]!.x.toFixed(3)}, ${live[l.slot]!.y.toFixed(3)}` : 'unknown'
+    from: live[l.slot] ? `${live[l.slot]!.x.toFixed(3)}, ${live[l.slot]!.y.toFixed(3)}, ${live[l.slot]!.z.toFixed(3)}` : 'unknown'
   }));
-  pending.value = selected.value;
+  pending.value = JSON.parse(JSON.stringify(selected.value));
 });
 
 const confirmApply = () => run(async () => {
   if (!pending.value) return;
-  await ws.apply(pending.value);
+  verifyResult.value = await ws.apply(pending.value);
   pending.value = null;
-  verifyResult.value = await ws.verify(selected.value!);
 });
 
 const doVerify = () => run(async () => {

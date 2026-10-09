@@ -56,7 +56,7 @@
         :active-workspace-id="activeWorkspaceId"
         @change-workspace="handleWorkspaceChange"
         @change-workspace-set="handleWorkspaceSetChange"
-        @manage-workspaces="showWorkspacesDialog = true"
+        @manage-workspaces="requestedWorkspaceId = null; showWorkspacesDialog = true"
         @show-update-dialog="openUpdateDialog"
         @show-bluetooth="showPendantDialog = true"
         :on-show-settings="openSettings"
@@ -871,6 +871,7 @@
 
   <WorkspacesDialog
     :is-open="showWorkspacesDialog"
+    :initial-workspace-id="requestedWorkspaceId"
     @close="showWorkspacesDialog = false"
   />
 
@@ -1314,6 +1315,7 @@ const fetchAlarmDescription = store.setLastAlarmCode;
 
 // Handle workspace change from toolbar
 const showWorkspacesDialog = ref(false);
+const requestedWorkspaceId = ref<string | null>(null);
 const workspacesStore = useWorkspaces();
 const workspaceSets = computed(() => workspacesStore.workspaces.value.map(w => ({ id: w.id, name: w.name })));
 const activeWorkspaceId = computed(() => workspacesStore.activeId.value);
@@ -1323,7 +1325,7 @@ const activeWorkspaceId = computed(() => workspacesStore.activeId.value);
 // is never something to do on one click without seeing what changes.
 const handleWorkspaceSetChange = (id: string) => {
   if (!id) return;
-  workspacesStore.activeId.value = id;
+  requestedWorkspaceId.value = id;
   showWorkspacesDialog.value = true;
 };
 

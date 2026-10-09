@@ -1,25 +1,3 @@
-// Workspaces: named sets of work-offset positions.
-//
-// The controller has six WCS slots (G54-G59) and they fill up. A Workspace is a
-// named set of positions that gets loaded INTO those slots on demand, so the
-// slots become scratch space and the library is the real storage.
-//
-// Two rules decided at the machine on 2026-10-09 and proven there:
-//
-//  1. Loading a position writes X and Y only, never Z. Z is a property of the
-//     stock, not the fixture, and is touched off per blank. Verified that
-//     `G10 L2` with no Z word leaves the stored Z untouched.
-//  2. Capture reads `$#`, not the status report's WCO. WCO is the sum of the
-//     work offset, G92 and the tool length offset - its Z is contaminated by
-//     TLO (observed: G54 Z 23.324 + TLO -60.955 = WCO Z -37.631). `$#` reports
-//     the stored offsets themselves.
-//
-// Clearing a slot is a different operation from loading one: it writes X0 Y0 Z0,
-// wiping any stale Z, because the slot is being declared meaningless. An unused
-// slot sitting at zero is deliberate - on this machine Y runs 0 to -1248, so a
-// program run against a zeroed slot leaves the envelope and trips soft limits
-// before it moves, rather than cutting somewhere plausible and wrong.
-
 export const WCS_SLOTS = ['G54', 'G55', 'G56', 'G57', 'G58', 'G59'] as const;
 export type WcsSlot = (typeof WCS_SLOTS)[number];
 
@@ -34,6 +12,7 @@ export function slotToP(slot: string): number {
 export interface SavedPosition {
   x: number;
   y: number;
+  z: number;
   savedAt: string;
 }
 
@@ -64,7 +43,7 @@ export function parseOffsetReport(text: string): Partial<Record<WcsSlot, {x: num
   return found;
 }
 
-/** True when `$#` reports a non-zero G92, which would corrupt a capture. */
+/** True when an additional G92 coordinate shift is active. */
 export function hasActiveG92(text: string): boolean {
   const match = /\[G92:(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/.exec(text);
   if (!match) return false;
@@ -75,25 +54,20 @@ export interface LoadLine {
   slot: WcsSlot;
   command: string;
   /** What this slot becomes. null means it is being cleared. */
-  to: {x: number; y: number} | null;
+  to: {x: number; y: number; z: number} | null;
 }
 
-/**
- * The G10 commands that put a workspace onto the machine.
- *
- * Slots the workspace defines get their X and Y. Slots it does not define are
- * cleared to zero - including Z - so nothing stale is left behind pretending to
- * be a position. Values are emitted in millimetres under G21 because that is
- * what `$#` reports, so a saved number makes the round trip unchanged.
- */
 export function buildLoadProgram(workspace: Workspace): LoadLine[] {
   const lines: LoadLine[] = [];
   for (const slot of WCS_SLOTS) {
     const saved = workspace.slots[slot];
     const p = slotToP(slot);
     if (saved) {
-      lines.push({slot, to: {x: saved.x, y: saved.y},
-        command: `G10 L2 P${p} X${fmt(saved.x)} Y${fmt(saved.y)}`});
+      if (![saved.x, saved.y, saved.z].every(Number.isFinite)) {
+        throw new Error(`${slot} is missing valid X/Y/Z offsets. Re-save this slot from the machine before loading.`);
+      }
+      lines.push({slot, to: {x: saved.x, y: saved.y, z: saved.z},
+        command: `G10 L2 P${p} X${fmt(saved.x)} Y${fmt(saved.y)} Z${fmt(saved.z)}`});
     } else {
       lines.push({slot, to: null, command: `G10 L2 P${p} X0 Y0 Z0`});
     }
@@ -101,9 +75,27 @@ export function buildLoadProgram(workspace: Workspace): LoadLine[] {
   return lines;
 }
 
-/** Commands to send, with the units/mode prefix the G10 lines rely on. */
+export function readModes(report: string) {
+  const words = /\[GC:([^\]]+)\]/.exec(report)?.[1].split(/\s+/) ?? [];
+  const units = words.find(word => word === 'G20' || word === 'G21');
+  const distance = words.find(word => word === 'G90' || word === 'G91');
+  if (!units || !distance) throw new Error('Could not read the controller units and distance mode.');
+  return `${units} ${distance}`;
+}
+
 export function loadCommands(workspace: Workspace): string[] {
-  return ['G21 G90', ...buildLoadProgram(workspace).map(l => l.command), 'G20'];
+  return ['G21 G90', ...buildLoadProgram(workspace).map(l => l.command)];
+}
+
+export function requireCompleteReport(report: string) {
+  const slots = parseOffsetReport(report);
+  for (const slot of WCS_SLOTS) {
+    const value = slots[slot];
+    if (!value || ![value.x, value.y, value.z].every(Number.isFinite)) {
+      throw new Error(`The controller did not report valid X/Y/Z offsets for ${slot}. Nothing was saved or loaded.`);
+    }
+  }
+  return slots;
 }
 
 /** Trailing zeros removed, but never exponent notation. */
@@ -123,11 +115,12 @@ export function verifyAgainstMachine(workspace: Workspace, report: string) {
     const saved = workspace.slots[slot];
     const live = actual[slot];
     if (!saved) {
-      const cleared = !live || (live.x === 0 && live.y === 0);
+      if (!live) return {slot, state: 'missing', saved: null, live: null};
+      const cleared = live.x === 0 && live.y === 0 && live.z === 0;
       return {slot, state: cleared ? 'unset' : 'unexpected', saved: null, live: live ?? null};
     }
     if (!live) return {slot, state: 'missing', saved, live: null};
-    const matches = Math.abs(live.x - saved.x) < 0.001 && Math.abs(live.y - saved.y) < 0.001;
+    const matches = Math.abs(live.x - saved.x) < 0.001 && Math.abs(live.y - saved.y) < 0.001 && Math.abs(live.z - saved.z) < 0.001;
     return {slot, state: matches ? 'ok' : 'differs', saved, live};
   });
   return {rows, ok: rows.every(r => r.state === 'ok' || r.state === 'unset')};
