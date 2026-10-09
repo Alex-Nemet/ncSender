@@ -79,7 +79,7 @@ remains unproven and is separate from the confirmed missing-ref defect.
 
 ## Validation and remaining work
 
-`node --test app/client/tests/workspaces.test.mjs` passes eleven tests: XYZ
+`node --test app/client/tests/workspaces.test.mjs` passes twelve tests, including failed-backup persistence: XYZ
 capture/persistence/restore, Z re-save, zero/Z-only offsets, legacy XY rejection,
 partial reads, rejected commands, mode restoration, verification failure,
 idle/G92 guards, clearing and listener cleanup. `npm run build:client` in `app` passes.

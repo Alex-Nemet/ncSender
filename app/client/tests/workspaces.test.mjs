@@ -14,12 +14,12 @@ const bundled = await build({
 const logicBundle = await build({entryPoints:['src/features/workspaces/workspaces.ts'],absWorkingDir:fileURLToPath(new URL('..',import.meta.url)),bundle:true,write:false,format:'esm'});
 const logic = await import(`data:text/javascript;base64,${Buffer.from(logicBundle.outputFiles[0].text).toString('base64')}`);
 const initial = [[979.418,-731.266,23.324],[672.831,-1141.713,27.725],[0,0,12],[0,0,0],[557.886,-797.533,-45.012],[36.718,-827.244,-45.294]];
-let live, settings, commands, failCommand, mode, machineStatus, tamper, partial, g92;
+let live, settings, commands, failCommand, mode, machineStatus, tamper, partial, g92, failPersist;
 const report = () => live.map((v,i)=>`[G${54+i}:${v.join(',')}]`).slice(0,partial?2:6).join('\n')+`\n[G59.1:99,99,99]\n[G92:${g92},0,0]\n[TLO:0,0,-60.955]\n[PRB:0,0,0:0]\n[GC:G0 G54 ${mode} M5]`;
 globalThis.workspaceTestApi = {
   baseUrl:'http://fake',
   getSettings:async()=>structuredClone(settings),
-  updateSettings:async value=>{settings=JSON.parse(JSON.stringify(value));},
+  updateSettings:async value=>{if(failPersist) throw new Error('Save failed');settings=JSON.parse(JSON.stringify(value));},
   getServerState:async()=>({machineState:{status:machineStatus},jobLoaded:null}),
   sendCommand:async command=>{
     commands.push(command);
@@ -35,7 +35,7 @@ globalThis.workspaceTestApi = {
 globalThis.fetch=async()=>({ok:true,json:async()=>({report:report()})});
 const {useWorkspaces}=await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 const ws=useWorkspaces();
-async function reset(){live=structuredClone(initial);settings={workspaces:[],activeWorkspaceId:null};commands=[];failCommand=null;mode='G20 G91';machineStatus='Idle';tamper=false;partial=false;g92=0;await ws.load();}
+async function reset(){live=structuredClone(initial);settings={workspaces:[],activeWorkspaceId:null};commands=[];failCommand=null;mode='G20 G91';machineStatus='Idle';tamper=false;partial=false;g92=0;failPersist=false;await ws.load();}
 
 test('capture, reload saved settings, restore and verify six XYZ slots without mixing in TLO',async()=>{
  await reset();
@@ -96,4 +96,9 @@ test('server refuses incomplete, disconnected, and timed-out reports',async()=>{
  await assert.rejects(readOffsets(controller),/incomplete/);
  controller.sendCommand=async()=>{throw new Error('not connected');};await assert.rejects(readOffsets(controller),/not connected/);
  controller.sendCommand=()=>new Promise(()=>{});await assert.rejects(readOffsets(controller,10),/in time/);assert.equal(controller.listenerCount('data'),0);
+});
+
+test('failed first backup never unlocks workspace loading',async()=>{
+ await reset();failPersist=true;await assert.rejects(ws.captureAll('Default'),/Save failed/);
+ assert.equal(ws.workspaces.value.length,0);assert.equal(settings.workspaces.length,0);
 });

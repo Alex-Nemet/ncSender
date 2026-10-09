@@ -51,8 +51,9 @@ export function useWorkspaces() {
       const value = live[slot];
       workspace.slots[slot] = {...value!, savedAt: now};
     }
-    workspaces.value.push(workspace);
-    await persist();
+    const updated = [...workspaces.value, workspace];
+    await api.updateSettings({workspaces: updated, activeWorkspaceId: activeId.value});
+    workspaces.value = updated;
     return workspace;
   }
 
