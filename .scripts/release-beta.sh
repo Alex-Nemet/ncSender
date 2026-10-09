@@ -9,7 +9,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 # Get the latest stable tag (exclude beta tags)
-LATEST_STABLE_TAG=$(git tag --sort=-version:refname | grep -v "beta" | head -1)
+LATEST_STABLE_TAG=$(git tag --merged HEAD --sort=-version:refname | grep -v "beta" | head -1)
 if [ -z "$LATEST_STABLE_TAG" ]; then
     LATEST_STABLE_TAG="v0.0.0"
 fi
@@ -77,8 +77,13 @@ Rules:
 Output ONLY the markdown. No preamble. No explanation. Just the markdown."
 
 # Use Claude CLI to generate release notes
-RELEASE_NOTES=$(claude -p "$PROMPT" 2>&1)
-CLAUDE_EXIT_CODE=$?
+if [ -n "${RELEASE_NOTES_PATH:-}" ]; then
+    RELEASE_NOTES=$(cat "$RELEASE_NOTES_PATH")
+    CLAUDE_EXIT_CODE=0
+else
+    CLAUDE_EXIT_CODE=0
+    RELEASE_NOTES=$(claude -p "$PROMPT" 2>&1) || CLAUDE_EXIT_CODE=$?
+fi
 
 if [ $CLAUDE_EXIT_CODE -ne 0 ] || [ -z "$RELEASE_NOTES" ]; then
     echo "❌ Failed to generate release notes with Claude"

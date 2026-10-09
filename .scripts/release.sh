@@ -2,6 +2,10 @@
 
 set -e
 
+if [ "${1:-}" = "--beta" ]; then
+    exec bash "$(dirname "$0")/release-beta.sh"
+fi
+
 # Get the latest STABLE tag (exclude beta tags)
 LATEST_TAG=$(git tag --sort=-version:refname | grep -v '\-beta' | head -1)
 if [ -z "$LATEST_TAG" ]; then
