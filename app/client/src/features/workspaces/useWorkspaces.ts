@@ -6,41 +6,20 @@ import {
   parseOffsetReport, hasActiveG92, loadCommands, verifyAgainstMachine
 } from './workspaces';
 
-/** `$#` has no reply route of its own; the controller's answer arrives on the
- *  cnc-data broadcast like any other output, so it is collected there. */
-export function readOffsetReport(timeoutMs = 3000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let text = '';
-    let done = false;
-    const finish = (error?: Error) => {
-      if (done) return;
-      done = true;
-      off?.();
-      clearTimeout(timer);
-      if (error) reject(error); else resolve(text);
-    };
-    const off = api.on('cnc-data', (payload: any) => {
-      const chunk = typeof payload === 'string' ? payload : (payload?.data ?? payload?.raw ?? '');
-      if (!chunk) return;
-      text += chunk;
-      // PRB is the last line of the report, so it marks the end.
-      if (/\[PRB:/.test(text)) finish();
-    });
-    const timer = setTimeout(() => {
-      if (/\[G54:/.test(text)) finish();            // partial but usable
-      else finish(new Error('The controller did not answer $# in time.'));
-    }, timeoutMs);
-    api.sendCommandViaWebSocket({command: '$#', displayCommand: '$#', meta: {sourceId: 'workspaces'}})
-      .catch((error: any) => finish(error instanceof Error ? error : new Error(String(error))));
-  });
+/**
+ * Read the controller's work offsets.
+ *
+ * This goes through the server rather than watching the websocket: `$#` output
+ * is not broadcast as `cnc-data` (that fires only for `?` status polls), so the
+ * reply is collected server-side off the controller's own `data` event, the way
+ * the firmware routes already do it.
+ */
+export async function readOffsetReport(): Promise<string> {
+  const response = await fetch('/api/work-offsets');
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || 'Could not read the work offsets from the controller.');
+  return payload.report as string;
 }
-
-// Module-level so the toolbar and the dialog share one copy: a save made in the
-// dialog has to show up in the toolbar's list without a reload.
-const workspaces = ref<Workspace[]>([]);
-const activeId = ref<string | null>(null);
-const busy = ref(false);
-const error = ref('');
 
 export function useWorkspaces() {
 

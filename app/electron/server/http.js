@@ -26,6 +26,7 @@ import { createGCodeRoutes } from '../features/gcode/routes.js';
 import { createGCodePreviewRoutes } from '../features/gcode/preview-routes.js';
 import { createGCodeJobRoutes } from '../features/gcode/job-routes.js';
 import { createFirmwareRoutes } from '../features/firmware/routes.js';
+import { createWorkspaceRoutes } from '../features/workspaces/routes.js';
 import { createProbeRoutes } from '../features/probe/routes.js';
 import { createMacroRoutes } from '../features/macro/routes.js';
 import { createToolRoutes } from '../features/tool/routes.js';
@@ -84,6 +85,7 @@ export function mountHttp({
   app.use('/api/gcode-preview', createGCodePreviewRoutes(serverState, broadcast));
   app.use('/api/gcode-job', createGCodeJobRoutes(filesDir, cncController, serverState, broadcast, commandProcessor));
   app.use('/api/firmware', createFirmwareRoutes(cncController, broadcast, autoConnector));
+  app.use('/api', createWorkspaceRoutes(cncController));
   app.use('/api/probe', createProbeRoutes(cncController, serverState, broadcast));
   app.use('/api', createMacroRoutes(cncController, commandProcessor));
   app.use('/api', createToolRoutes(cncController, serverState, commandProcessor));
