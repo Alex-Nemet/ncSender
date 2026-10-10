@@ -1,12 +1,25 @@
 import express from 'express';
+import {readSettings, saveSettings} from '../../core/settings-manager.js';
+import {createWorkspaceService} from './service.js';
+import {requireCompleteReport, hasActiveG92, readModes} from './model.js';
 
 const REPORT_TIMEOUT_MS = 4000;
 
-export function createWorkspaceRoutes(cncController) {
+export function createWorkspaceRoutes(cncController, serverState, broadcast) {
+  const service = createWorkspaceService({controller: cncController, serverState, broadcast, readSettings, saveSettings, readOffsets});
   const router = express.Router();
+  router.get('/workspaces', (_req, res) => res.json(service.state()));
+  router.post('/workspaces/:action', async (req, res) => {
+    try {
+      const result = await service.execute(req.params.action, req.body);
+      res.json({state: service.state(), result});
+    } catch (error) {
+      res.status(409).json({error: error.message, state: service.state()});
+    }
+  });
   router.get('/work-offsets', async (_req, res) => {
     try {
-      res.json(await readOffsets(cncController));
+      res.json(await service.execute('report'));
     } catch (error) {
       res.status(503).json({ error: error?.message || 'Could not read the work offsets.' });
     }
@@ -29,10 +42,12 @@ export function readOffsets(cncController, timeoutMs = REPORT_TIMEOUT_MS) {
       cncController.removeListener('data', dataHandler);
       if (error) return reject(error);
       const report = lines.join('\n');
-      const slots = parseSlots(report);
-      if (Object.keys(slots).length !== 6 || !/\[G92:/.test(report) || !/\[GC:/.test(report)) {
-        return reject(new Error('The controller returned an incomplete work-offset report.'));
-      }
+      let slots;
+      try {
+        slots = requireCompleteReport(report);
+        hasActiveG92(report);
+        readModes(report);
+      } catch (error) { return reject(error); }
       resolve({ report, slots });
     };
     const timer = setTimeout(() => finish(new Error('The controller did not answer in time.')), timeoutMs);
@@ -45,15 +60,4 @@ export function readOffsets(cncController, timeoutMs = REPORT_TIMEOUT_MS) {
       finish();
     })().catch(error => finish(new Error(`Could not read work offsets: ${error?.message || error}`)));
   });
-}
-
-function parseSlots(report) {
-  const slots = {};
-  const pattern = /\[(G5[4-9]):(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/g;
-  let match;
-  while ((match = pattern.exec(report)) !== null) {
-    const value = { x: Number(match[2]), y: Number(match[3]), z: Number(match[4]) };
-    if (Object.values(value).every(Number.isFinite)) slots[match[1]] = value;
-  }
-  return slots;
 }

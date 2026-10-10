@@ -1,94 +1,79 @@
-# Workspaces — named sets of work offsets
+# Workspace handoff
 
-Branch: `feature/workspaces` · Updated 2026-10-09
+Branch: `feature/workspaces` · Updated 2026-10-10
 
-## Intended behavior
+## Behavior
 
-A workspace saves **X, Y and Z** work offsets for G54–G59. Loading it restores
-those saved values, just as each controller WCS remembers its own XYZ zero.
-The user may touch off Z normally, then re-save the slot to remember its new value.
-This supersedes the original XY-only design.
+Named workspaces store the X/Y/Z offsets for G54–G59. Confirmed G10 L2/L20
+changes automatically update the current workspace on the PC. Probe changes are
+saved once probing finishes and the controller is idle. Autosaving only reads the
+controller; it adds no controller offset writes.
 
-Tool length compensation, G92, machine settings, and physical machine position
-are separate from the saved work offsets. Capture uses `$#`, never status `WCO`,
-which includes G92 and tool length compensation. The measured G54 Z was 23.324 mm,
-TLO was −60.955 mm, and WCO Z was −37.631 mm: saving WCO would mix them together.
+The toolbar switches directly while idle, saving any outstanding outgoing changes,
+writing only differing slots, restoring units/distance mode, and verifying all six
+slots before marking the new workspace current. An empty workspace needs one
+confirmation because switching clears all six XYZ offsets. Creating an empty
+workspace or importing a file only adds it to the library.
 
-## First Windows machine test
+Manage shows saved XYZ values and supports rename, capture, per-slot save,
+verification, export/import, and persistent per-workspace Undo/Redo history (last
+100 changes). Undo/Redo restore controller offsets and the saved workspace; they do
+not undo motion. A new coordinate change after Undo discards the redo entries.
+Exports are versioned JSON workspace coordinates, not full controller settings.
+Import creates a fresh identity and does not load the controller or establish the
+initial backup. Capture saves all six current slots and marks that workspace current.
 
-1. Close the existing ncSender before starting the preview build.
-2. Open **Workspace → Manage…**. Use **Capture all six from machine**, named
-   **Default**, before any load is available. This only reads/saves offsets.
-   Check the saved XYZ values against the controller's current values.
-3. Verify Default; it should match. Keep the external offset backup too.
-4. **Create empty** creates a saved workspace without changing the machine.
-5. **Load onto machine** previews all six before/after XYZ values. Only confirming
-   **Write offsets** writes them. Loading an empty workspace sets all six to XYZ zero.
-6. Without running a job, load Default and verify that all original XYZ values return.
-7. For a new setup, set each WCS normally, then **Save current G54**, etc.
-   After adjusting Z, **Re-save** that slot before switching away.
+## Windows test
 
-Saving is explicit, not automatic. Selecting a workspace opens the dialog; only
-an acknowledged and verified load marks it active. Loading offsets commands no
-motion. Zeroed slots are **not** a general safety mechanism; do not run a job
-against a slot that has not been set up.
+1. Install the beta release's Windows EXE and close the previous ncSender instance.
+2. In Manage, capture Default if this is the first setup. For an older capture
+   showing None, select it and Verify to identify it without controller writes.
+3. Export Default as a known-good backup. Check its saved XYZ values.
+4. While idle, change G55 XY or Z using the normal controls. Confirm the saved
+   value and history update automatically. Undo and Redo should restore both
+   controller offsets and the displayed saved values.
+5. Create an empty workspace. Creation alone must not change the controller.
+   Switch to it and confirm clearing. Set G55 normally, then switch to Default
+   and back. Each workspace should restore its own XYZ coordinates.
+6. Rename a workspace, export/import it, and restart ncSender. Names, current
+   identity, saved coordinates and history should persist.
 
-## Implementation rules
+## Implementation and limits
 
-- Capture all preserves all six slots, including all-zero and Z-only offsets.
-- Loads write saved XYZ. Slots absent from a workspace are cleared in all three axes.
-- Clear edits the saved workspace; the machine changes only on confirmed load.
-- Old XY-only slots must be re-saved from the intended setup before loading.
-  Missing Z is never guessed or replaced with zero.
-- `$#` and `$G` reads await controller acknowledgement and require complete replies.
-  G59.1–.3 are outside this feature's scope. Partial reports cannot silently clear slots.
-- G92 must be zero for capture/load because its separate temporary shift is not saved.
-- The machine must be idle with no running/paused job. Each write is acknowledged.
-  A failure may leave partially changed offsets; no workspace is marked loaded.
-- Prior units/distance modes come from `$G` and are restored even after a write failure.
-- Read-back verification includes Z, cleared slots, and missing slots.
-- Saved numbers assume this machine's `$13=0` millimetre reporting.
-- A workspace label is not live proof of matching offsets after outside edits.
-  Use Verify and re-save adjusted offsets as needed.
+- `app/electron/features/workspaces/model.js`: shared parsing, comparison, history,
+  import/export and G10 generation; `service.js`: serialized operations and autosave.
+- `routes.js`: API and complete acknowledged `$#`/`$G` reports with timeouts.
+- `useWorkspaces.ts`: shared reactive state, API calls and live updates.
+- `WorkspacesDialog.vue`, `App.vue`, `TopToolbar.vue`: user controls and current label.
+- Controller/job-manager guards prevent other commands/jobs interleaving with a
+  workspace write transaction. Stop/reset/status commands remain available.
+- Capture is required before the first switch. Failed persistence cannot unlock it.
+- Old XY-only slots must be re-saved with Z before loading; missing Z is not guessed.
+- Missing slots load as XYZ zero; already matching/zero slots are not rewritten.
+- G92 must be zero. Tool length compensation and physical position are separate.
+  Capture uses `$#`, never status WCO (which includes G92/tool compensation).
+- Numeric reports assume this machine's `$13=0` millimetre reporting.
+- A rejected write or mismatched read-back leaves no workspace marked current.
+  Inspect the offsets before proceeding after a partial failure.
+- Autosave observes acknowledged commands sent through ncSender. Outside controller
+  edits are reconciled on switching/exporting; a persisted label is not proof that
+  externally changed hardware still matches. Verify checks the live controller.
 
-## Confirmed startup bug
+## Validation and delivery
 
-`useWorkspaces.ts` returned `workspaces`, `activeId`, `busy`, and `error` without
-any declarations. `App.vue` calls it during setup, causing a ReferenceError and
-preventing mounting. Shared module-level Vue refs now exist. Tests instantiate
-the composable and confirm callers share the same state.
+`node --test app/client/tests/workspaces.test.mjs` covers simulated XYZ autosave,
+history, switching, skipped writes, failures, persistence, import/export and report
+collection. `npm --prefix app run build:client` builds the client. The beta pipeline
+runs the workspace suite on all build platforms before packaging.
 
-The older handoff also reported `/api/init` hanging in a local standalone Node
-process. The init route has no diff against main. An isolated server using temporary
-settings, disabled CNC auto-connect and `UV_THREADPOOL_SIZE=16` returned the full
-init payload without a controller. The exact cause of the older process's hang
-remains unproven and is separate from the confirmed missing-ref defect.
+No physical CNC offsets were changed during development. The Windows/controller
+round trip remains a hardware acceptance test. Local interactive GUI testing was
+unavailable because computer-use permissions were not granted.
 
-## Files
+Use `RELEASE_NOTES_PATH=<notes-file> bash .scripts/release.sh --beta` after committing.
+Deliver the GitHub beta release's direct Windows EXE, not an Actions-only artifact.
+The earlier blank startup was missing shared Vue refs in useWorkspaces, fixed in
+cb48bba. The prior isolated `/api/init` hang was not reproduced and remains separate.
 
-- `app/client/src/features/workspaces/workspaces.ts`: XYZ data, complete-report
-  validation, G10 generation, modal parsing, verification.
-- `app/client/src/features/workspaces/useWorkspaces.ts`: shared state, persistence,
-  capture, acknowledged loading and read-back verification.
-- `app/client/src/features/workspaces/WorkspacesDialog.vue`: XYZ table and load preview.
-- `app/electron/features/workspaces/routes.js`: `$#` / `$G` collection and timeouts.
-- `App.vue` / `TopToolbar.vue`: requested selection stays separate from loaded identity.
-- `app/client/tests/workspaces.test.mjs`: simulated controller and route regressions.
-- `.github/workflows/workspace-preview.yml`: Windows preview artifact build on this
-  branch; no stable release or version tag is created.
-
-## Validation and remaining work
-
-`node --test app/client/tests/workspaces.test.mjs` passes twelve tests, including failed-backup persistence: XYZ
-capture/persistence/restore, Z re-save, zero/Z-only offsets, legacy XY rejection,
-partial reads, rejected commands, mode restoration, verification failure,
-idle/G92 guards, clearing and listener cleanup. `npm run build:client` in `app` passes.
-
-The real Windows UI and physical-controller round trip still need the user's
-machine test. Local interactive inspection was unavailable because computer-use
-permissions were not granted. No real controller offsets were written in this session.
-
-## External backup from the previous session
-
-`wcs-backups/offsets-2026-10-09.md` in the `ncSender-plugins` repository contains the
-six original positions and a paste-ready restore script.
+The prior external backup is `wcs-backups/offsets-2026-10-09.md` in the
+`ncSender-plugins` repository.

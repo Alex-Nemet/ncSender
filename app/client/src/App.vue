@@ -54,6 +54,13 @@
         @unlock="handleUnlock"
         :workspace-sets="workspaceSets"
         :active-workspace-id="activeWorkspaceId"
+        :workspace-busy="workspacesStore.busy.value"
+        :workspace-error="workspacesStore.error.value"
+        :workspace-message="workspacesStore.message.value"
+        :workspace-can-undo="workspacesStore.canUndo.value"
+        :workspace-can-redo="workspacesStore.canRedo.value"
+        @workspace-undo="handleWorkspaceHistory('undo')"
+        @workspace-redo="handleWorkspaceHistory('redo')"
         @change-workspace="handleWorkspaceChange"
         @change-workspace-set="handleWorkspaceSetChange"
         @manage-workspaces="requestedWorkspaceId = null; showWorkspacesDialog = true"
@@ -1320,13 +1327,16 @@ const workspacesStore = useWorkspaces();
 const workspaceSets = computed(() => workspacesStore.workspaces.value.map(w => ({ id: w.id, name: w.name })));
 const activeWorkspaceId = computed(() => workspacesStore.activeId.value);
 
-// Selecting a set from the toolbar opens the dialog rather than writing offsets
-// straight away: loading clears every slot the workspace does not define, which
-// is never something to do on one click without seeing what changes.
-const handleWorkspaceSetChange = (id: string) => {
+const handleWorkspaceSetChange = async (id: string) => {
   if (!id) return;
-  requestedWorkspaceId.value = id;
-  showWorkspacesDialog.value = true;
+  try { await workspacesStore.switchWorkspace(id); }
+  catch (e: any) { workspacesStore.error.value = e.message; }
+};
+const handleWorkspaceHistory = async (action: 'undo' | 'redo') => {
+  try {
+    await workspacesStore.act(action, {id: workspacesStore.activeId.value});
+    workspacesStore.message.value = `${action === 'undo' ? 'Undo' : 'Redo'} complete. Coordinates verified.`;
+  } catch (e: any) { workspacesStore.error.value = e.message; }
 };
 
 const handleWorkspaceChange = async (newWorkspace: string) => {
@@ -1836,6 +1846,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  workspacesStore.stop();
   document.removeEventListener('click', handleClickOutside);
   if (bluetoothPollInterval) {
     clearInterval(bluetoothPollInterval);
@@ -2792,7 +2803,8 @@ const pollBluetoothStatus = async () => {
 
 onMounted(async () => {
   // The toolbar needs the workspace names before anything is clicked.
-  workspacesStore.load().catch(() => {});
+  workspacesStore.listen();
+  workspacesStore.load().catch(e => {workspacesStore.error.value = e.message;});
 
   // Start polling Bluetooth status (only polls when showPendant is enabled)
   pollBluetoothStatus();

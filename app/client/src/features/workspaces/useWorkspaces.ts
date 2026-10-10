@@ -1,110 +1,64 @@
-// Talking to the controller and to settings on behalf of the Workspaces UI.
-import {ref} from 'vue';
-import { api } from '@/lib/api';
-import {
-  WCS_SLOTS, type WcsSlot, type Workspace,
-  requireCompleteReport, hasActiveG92, loadCommands, readModes, verifyAgainstMachine
-} from './workspaces';
-
-/**
- * Read the controller's work offsets.
- *
- * This goes through the server rather than watching the websocket: `$#` output
- * is not broadcast as `cnc-data` (that fires only for `?` status polls), so the
- * reply is collected server-side off the controller's own `data` event, the way
- * the firmware routes already do it.
- */
-export async function readOffsetReport(): Promise<string> {
-  const response = await fetch(`${api.baseUrl}/api/work-offsets`);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error || 'Could not read the work offsets from the controller.');
-  return payload.report as string;
-}
+import {computed, ref} from 'vue';
+import {api} from '@/lib/api';
+import type {Workspace} from './workspaces';
 
 const workspaces = ref<Workspace[]>([]);
 const activeId = ref<string | null>(null);
-const busy = ref(false);
+const serverBusy = ref(false);
+const requestBusy = ref(false);
+const busy = computed(() => serverBusy.value || requestBusy.value);
 const error = ref('');
+const message = ref('');
+const hasBackup = ref(false);
+let stopListening: (() => void) | null = null;
+let revision = 0;
 
-export function useWorkspaces() {
-
-  async function load() {
-    const settings = await api.getSettings();
-    workspaces.value = Array.isArray(settings?.workspaces) ? settings.workspaces : [];
-    activeId.value = settings?.activeWorkspaceId ?? null;
-  }
-
-  async function persist() {
-    await api.updateSettings({workspaces: workspaces.value, activeWorkspaceId: activeId.value});
-  }
-
-  /** Read every slot off the machine into a new workspace. */
-  async function captureAll(name: string): Promise<Workspace> {
-    const report = await readOffsetReport();
-    if (hasActiveG92(report)) {
-      throw new Error('G92 is active. Clear the temporary coordinate shift before capturing a workspace.');
-    }
-    const live = requireCompleteReport(report);
-    const now = new Date().toISOString();
-    const workspace: Workspace = {id: cryptoId(), name, slots: {}, createdAt: now};
-    for (const slot of WCS_SLOTS) {
-      const value = live[slot];
-      workspace.slots[slot] = {...value!, savedAt: now};
-    }
-    const updated = [...workspaces.value, workspace];
-    await api.updateSettings({workspaces: updated, activeWorkspaceId: activeId.value});
-    workspaces.value = updated;
-    return workspace;
-  }
-
-  /** Save one slot's current machine value into a workspace. */
-  async function saveSlot(workspace: Workspace, slot: WcsSlot) {
-    const report = await readOffsetReport();
-    if (hasActiveG92(report)) throw new Error('G92 is active; clear it (G92.1) before saving a position.');
-    const live = requireCompleteReport(report)[slot];
-    if (!live) throw new Error(`The controller did not report ${slot}.`);
-    workspace.slots[slot] = {x: live.x, y: live.y, z: live.z, savedAt: new Date().toISOString()};
-    await persist();
-  }
-
-  async function clearSlot(workspace: Workspace, slot: WcsSlot) {
-    delete workspace.slots[slot];
-    await persist();
-  }
-
-  /** Write a workspace onto the machine. Callers confirm with the user first. */
-  async function apply(workspace: Workspace) {
-    const state = await api.getServerState();
-    if (state.machineState?.status !== 'Idle' || ['running', 'paused'].includes(state.jobLoaded?.status)) {
-      throw new Error('Stop the job and wait for the machine to be idle before loading a workspace.');
-    }
-    const commands = loadCommands(workspace);
-    const report = await readOffsetReport();
-    requireCompleteReport(report);
-    if (hasActiveG92(report)) throw new Error('Clear the temporary G92 coordinate shift before loading a workspace.');
-    const modes = readModes(report);
-    const send = (command: string) => api.sendCommand(command, {displayCommand: command, meta: {sourceId: 'workspaces'}});
-    activeId.value = null;
-    await persist();
-    try {
-      for (const command of commands) await send(command);
-    } finally {
-      await send(modes);
-    }
-    const result = verifyAgainstMachine(workspace, await readOffsetReport());
-    if (!result.ok) throw new Error('The machine offsets do not match the workspace. Verify them before running a job.');
-    activeId.value = workspace.id;
-    await persist();
-    return result;
-  }
-
-  async function verify(workspace: Workspace) {
-    return verifyAgainstMachine(workspace, await readOffsetReport());
-  }
-
-  return {workspaces, activeId, busy, error, load, persist, captureAll, saveSlot, clearSlot, apply, verify};
+function receive(state: any) {
+  revision++;
+  workspaces.value = state.workspaces;
+  activeId.value = state.activeWorkspaceId;
+  serverBusy.value = state.busy;
+  hasBackup.value = state.hasBackup;
+  error.value = state.error || '';
 }
-
-function cryptoId() {
-  return globalThis.crypto?.randomUUID?.() ?? 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+async function load() {
+  const before = revision;
+  const response = await fetch(`${api.baseUrl}/api/workspaces`);
+  if (!response.ok) throw new Error('Could not load workspaces.');
+  const state = await response.json();
+  if (revision === before) receive(state);
+}
+async function act(action: string, data: any = {}) {
+  if (busy.value) throw new Error('A workspace operation is still in progress.');
+  requestBusy.value = true; error.value = ''; message.value = '';
+  try {
+    const response = await fetch(`${api.baseUrl}/api/workspaces/${action}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+    const payload = await response.json();
+    if (payload.state) receive(payload.state);
+    if (!response.ok) throw new Error(payload.error || 'Workspace operation failed.');
+    return payload.result;
+  } catch (e: any) { error.value = e.message; throw e; }
+  finally { requestBusy.value = false; }
+}
+async function switchWorkspace(id: string) {
+  if (id === activeId.value) return;
+  const workspace = workspaces.value.find(w => w.id === id);
+  if (!workspace) return;
+  const empty = Object.keys(workspace.slots).length === 0;
+  if (empty && !window.confirm(`Switch to empty workspace “${workspace.name}”? This clears X, Y and Z in all six WCS slots. Your current workspace will be saved first.`)) return;
+  const result = await act('switch', {id, confirmEmpty: empty});
+  message.value = `Switched to ${workspace.name}. ${result.written} WCS slots updated; coordinates verified.`;
+  return result;
+}
+function listen() {
+  if (stopListening) return;
+  const offUpdate = api.on('workspaces-updated', receive);
+  const offConnect = api.on('connected', () => load().catch(e => {error.value = e.message;}));
+  stopListening = () => {offUpdate(); offConnect(); stopListening = null;};
+}
+const current = computed(() => workspaces.value.find(w => w.id === activeId.value));
+const canUndo = computed(() => !!current.value && (current.value.historyIndex ?? current.value.history?.length ?? 0) > 0);
+const canRedo = computed(() => !!current.value && (current.value.historyIndex ?? current.value.history?.length ?? 0) < (current.value.history?.length ?? 0));
+export function useWorkspaces() {
+  return {workspaces, activeId, current, busy, error, message, hasBackup, canUndo, canRedo, load, act, switchWorkspace, listen, stop: () => stopListening?.()};
 }

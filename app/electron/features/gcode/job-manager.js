@@ -29,6 +29,7 @@ class JobProcessorManager {
   }
 
   async startJob(filePath, filename, cncController, broadcast, commandProcessor, options = {}) {
+    if (cncController.workspaceOperation) throw new Error('Wait for the workspace update to finish before starting a job.');
     if (this.currentJob) {
       throw new Error('A job is already running. Stop the current job before starting a new one.');
     }

@@ -1212,6 +1212,10 @@ export class CNCController extends EventEmitter {
       throw new Error('Command is empty');
     }
 
+    if (this.workspaceOperation && normalizedMeta?.sourceId !== 'workspaces' && !['?', '!', '\x18', '\x85', '\x87', '$G', '$#', '$PINSTATE'].includes(cleanCommand.toUpperCase())) {
+      throw new Error('Workspace coordinates are being updated. Wait for the operation to finish.');
+    }
+
     // Same-tool detection moved to CommandProcessor (upstream)
     // Commands are pre-processed by CommandProcessor → Plugin Manager before reaching controller
     // Door state safety check is also handled in CommandProcessor

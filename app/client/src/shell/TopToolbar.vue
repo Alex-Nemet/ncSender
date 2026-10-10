@@ -43,13 +43,17 @@
           class="workspace-select workspace-set-select"
           :value="activeWorkspaceId || ''"
           @change="onWorkspaceSetChange($event)"
-          title="Named set of work offsets"
+          title="Switch workspace and restore its coordinates"
+          :disabled="workspaceBusy || isWorkspaceDisabled"
         >
-          <option value="">— none —</option>
+          <option value="" disabled>— none —</option>
           <option v-for="w in workspaceSets" :key="w.id" :value="w.id">{{ w.name }}</option>
-          <option value="__manage">Manage…</option>
         </select>
       </div>
+      <button class="workspace-action" @click="$emit('manage-workspaces')">Manage…</button>
+      <button class="workspace-action" title="Undo coordinate change" aria-label="Undo coordinate change" :disabled="workspaceBusy || isWorkspaceDisabled || !workspaceCanUndo" @click="$emit('workspace-undo')">↶</button>
+      <button class="workspace-action" title="Redo coordinate change" aria-label="Redo coordinate change" :disabled="workspaceBusy || isWorkspaceDisabled || !workspaceCanRedo" @click="$emit('workspace-redo')">↷</button>
+      <span v-if="workspaceBusy || workspaceError || workspaceMessage" class="workspace-feedback" :class="{ 'workspace-error': workspaceError }" :title="workspaceError || workspaceMessage" role="status" @click="$emit('manage-workspaces')">{{ workspaceBusy ? 'Saving / switching…' : workspaceError ? 'Workspace error — Manage' : workspaceMessage }}</span>
       <div class="workspace-selector">
         <label class="workspace-label" for="workspace-select">WCS:</label>
         <select
@@ -57,7 +61,7 @@
           class="workspace-select"
           :value="workspace"
           @change="onWorkspaceChange($event)"
-          :disabled="isWorkspaceDisabled"
+          :disabled="isWorkspaceDisabled || workspaceBusy"
         >
           <option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}</option>
         </select>
@@ -211,6 +215,11 @@ const props = defineProps<{
   showPendant?: boolean;
   workspaceSets?: Array<{ id: string; name: string }>;
   activeWorkspaceId?: string | null;
+  workspaceBusy?: boolean;
+  workspaceError?: string;
+  workspaceMessage?: string;
+  workspaceCanUndo?: boolean;
+  workspaceCanRedo?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -219,6 +228,8 @@ const emit = defineEmits<{
   (e: 'change-workspace', value: string): void;
   (e: 'change-workspace-set', id: string): void;
   (e: 'manage-workspaces'): void;
+  (e: 'workspace-undo'): void;
+  (e: 'workspace-redo'): void;
   (e: 'show-update-dialog'): void;
   (e: 'show-bluetooth'): void;
 }>();
@@ -441,6 +452,10 @@ const onWorkspaceChange = (e: Event) => {
 </script>
 
 <style scoped>
+.workspace-action { padding: 4px 7px; border: 1px solid #8886; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
+.workspace-action:disabled { opacity: .4; cursor: default; }
+.workspace-feedback { max-width: 160px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.workspace-error { color: #ff9b9b; }
 .toolbar {
   background: var(--color-surface);
   border-radius: var(--radius-medium);

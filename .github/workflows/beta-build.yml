@@ -87,6 +87,9 @@ jobs:
           cd client && npm ci
         working-directory: app
 
+      - name: Test workspaces
+        run: node --test app/client/tests/workspaces.test.mjs
+
       - name: Build Client
         run: npm run build:client
         working-directory: app
@@ -139,6 +142,9 @@ jobs:
           cd client && npm ci
         working-directory: app
 
+      - name: Test workspaces
+        run: node --test app/client/tests/workspaces.test.mjs
+
       - name: Build Client
         run: npm run build:client
         working-directory: app
@@ -184,6 +190,9 @@ jobs:
           npm ci
           cd client && npm ci
         working-directory: app
+
+      - name: Test workspaces
+        run: node --test app/client/tests/workspaces.test.mjs
 
       - name: Build Client
         run: npm run build:client
@@ -241,6 +250,9 @@ jobs:
           npm ci
           cd client && npm ci
         working-directory: app
+
+      - name: Test workspaces
+        run: node --test app/client/tests/workspaces.test.mjs
 
       - name: Build Client
         run: npm run build:client
