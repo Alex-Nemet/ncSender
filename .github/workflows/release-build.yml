@@ -55,7 +55,7 @@ jobs:
   macos:
     name: macOS Builds
     needs: [prepare-release]
-    runs-on: macos-14  # macOS Sonoma (stable)
+    runs-on: macos-15  # macOS Sonoma (stable)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
