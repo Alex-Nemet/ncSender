@@ -27,3 +27,13 @@ test('real moves above the machine top are still flagged', () => {
   assert.equal(v.hasOutOfBoundsMovement(), true);
   assert.deepEqual(v.getOutOfBoundsDirections(), ['Z+']);
 });
+
+test('G28 lift keeps following through several Z zero changes with uneven heights', () => {
+  const v = new GCodeVisualizer();
+  v.setGridBounds(bounds(69.1237));
+  v.render(program);
+  for (const top of [51.3437, 51.0897, 60.7771, 33.3333]) {
+    v.setGridBounds(bounds(top));
+    assert.equal(v.hasOutOfBoundsMovement(), false, 'flagged at top ' + top);
+  }
+});

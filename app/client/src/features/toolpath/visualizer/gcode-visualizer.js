@@ -816,7 +816,8 @@ class GCodeVisualizer {
             if (this._g28HomeZ != null && typeof newHomeZ === 'number' && Math.abs(newHomeZ - this._g28HomeZ) > 1e-9) {
                 const oldHomeZ = this._g28HomeZ;
                 for (let i = 2; i < positions.length; i += 3) {
-                    if (Math.abs(positions[i] - oldHomeZ) < 1e-6) positions[i] = newHomeZ;
+                    // Positions are 32-bit floats, so allow for rounding (0.001 mm).
+                    if (Math.abs(positions[i] - oldHomeZ) < 1e-3) positions[i] = newHomeZ;
                 }
                 posAttr.needsUpdate = true;
                 line.geometry.computeBoundingSphere?.();
