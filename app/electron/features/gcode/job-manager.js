@@ -19,8 +19,21 @@ import { GCodeJobProcessor } from './job-routes.js';
 import { GrblHalTelemetryProvider } from '../cnc/telemetry-provider.js';
 import { JobProgressEstimator } from './job-progress-estimator.js';
 import { createLogger } from '../../core/logger.js';
+import fs from 'node:fs/promises';
 
 const { log, error: logError } = createLogger('JobManager');
+
+// The last G54-G59 a program selects, or null if it never picks one.
+export function lastWcsInProgram(content) {
+  let last = null;
+  for (const raw of content.split(/\r?\n/)) {
+    const line = raw.replace(/\([^)]*\)/g, '').replace(/;.*$/, '');
+    const re = /G0*5([4-9])(?![.\d])/gi;
+    let m;
+    while ((m = re.exec(line)) !== null) last = 'G5' + m[1];
+  }
+  return last;
+}
 
 class JobProcessorManager {
   constructor() {
@@ -32,6 +45,15 @@ class JobProcessorManager {
     if (cncController.workspaceOperation) throw new Error('Wait for the workspace update to finish before starting a job.');
     if (this.currentJob) {
       throw new Error('A job is already running. Stop the current job before starting a new one.');
+    }
+
+    // M30 makes the controller drop back to G54. After a finished job, switch back to the
+    // WCS the program used last (or the one active at start) so a re-run or jog stays put.
+    let restoreWcs = options.serverState?.machineState?.workspace || null;
+    try {
+      restoreWcs = lastWcsInProgram(await fs.readFile(filePath, 'utf8')) || restoreWcs;
+    } catch (err) {
+      logError('Could not read program for its WCS:', err?.message || err);
     }
 
     // Callback to check if we should count time (only count when senderStatus is 'running')
@@ -67,6 +89,13 @@ class JobProcessorManager {
       const finalJobStatus = wasRunning ? this.getJobStatus() : null;
 
       this.currentJob = null;
+
+      if (reason === 'completed' && /^G5[4-9]$/.test(restoreWcs || '')) {
+        log(`Job finished: restoring ${restoreWcs}`);
+        cncController.sendCommand(restoreWcs, { meta: { sourceId: 'system' } }).catch((err) => {
+          logError('Could not restore WCS after job:', err?.message || err);
+        });
+      }
 
       // Call external completion callback if set and job was actually running
       if (wasRunning && this.onJobCompleteCallback) {

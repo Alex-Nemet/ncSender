@@ -192,6 +192,7 @@ class GCodeVisualizer {
         let currentTool = null; // Track active tool number
 
         // Reset tracking
+        this._g28HomeZ = null;
         this._outOfBoundsAxes.clear();
         this._outOfBoundsDirections.clear();
         this.toolsUsed.clear();
@@ -257,6 +258,7 @@ class GCodeVisualizer {
                 if (!hasZ) return;
 
                 const homeZ = this.gridBounds?.maxZ ?? 0;
+                this._g28HomeZ = homeZ;
 
                 if (homeZ !== currentPos.z) {
                     this.lineMoveType.set(lineNumber, 'rapid');
@@ -806,6 +808,21 @@ class GCodeVisualizer {
 
             const colors = colorAttr.array;
             const positions = posAttr.array;
+
+            // G28 moves were drawn up to the machine top as it was at load time. When Z zero or
+            // the WCS changes, the top moves in work coordinates, so move those points with it
+            // instead of flagging them as above the machine.
+            const newHomeZ = this.gridBounds?.maxZ;
+            if (this._g28HomeZ != null && typeof newHomeZ === 'number' && Math.abs(newHomeZ - this._g28HomeZ) > 1e-9) {
+                const oldHomeZ = this._g28HomeZ;
+                for (let i = 2; i < positions.length; i += 3) {
+                    if (Math.abs(positions[i] - oldHomeZ) < 1e-6) positions[i] = newHomeZ;
+                }
+                posAttr.needsUpdate = true;
+                line.geometry.computeBoundingSphere?.();
+                this._g28HomeZ = newHomeZ;
+            }
+
             const completedRapid = new THREE.Color(this.moveColors.completedRapid);
             const completedCutting = new THREE.Color(this.moveColors.completedCutting);
             const oobColor = new THREE.Color(this.moveColors.outOfBounds);
