@@ -42,7 +42,8 @@ const DEFAULT_DISABLE_INSTALL = process.env.NCSENDER_UPDATE_DISABLE_INSTALL === 
   ? true
   : (process.env.NCSENDER_UPDATE_DISABLE_INSTALL === 'false'
       ? false
-      : process.platform !== 'linux');
+      // Windows (NSIS) and Linux can install in place; unsigned macOS builds can't.
+      : process.platform === 'darwin');
 
 const formatReleaseNotes = (releaseNotes) => {
   if (!releaseNotes) {
