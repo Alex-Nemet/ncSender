@@ -55,6 +55,7 @@ jobs:
   macos:
     name: macOS Builds
     needs: [prepare-release]
+    if: false  # Windows only
     runs-on: macos-15  # macOS Sonoma (stable)
     steps:
       - name: Checkout
@@ -96,6 +97,7 @@ jobs:
   linux:
     name: Linux Builds
     needs: [prepare-release]
+    if: false  # Windows only
     runs-on: ubuntu-22.04  # Ubuntu 22.04 LTS (stable)
     strategy:
       fail-fast: false
@@ -195,6 +197,7 @@ jobs:
   linux-arm64:
     name: Linux ARM64 Build
     needs: [prepare-release]
+    if: false  # Windows only
     runs-on: ubuntu-22.04  # Ubuntu 22.04 LTS (stable)
     steps:
       - name: Checkout
@@ -257,7 +260,7 @@ jobs:
 
   publish-release:
     name: Publish Release
-    needs: [prepare-release, macos, linux, windows, linux-arm64]
+    needs: [prepare-release, windows]
     runs-on: ubuntu-22.04  # Ubuntu 22.04 LTS (stable)
     permissions:
       contents: write
