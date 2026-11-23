@@ -1,4 +1,4 @@
-import {WCS_SLOTS, ZERO, samePosition, requireCompleteReport, hasActiveG92, readModes, buildLoadProgram, verifyAgainstMachine, snapshot, recordChange, historyTarget, workspaceName, importWorkspace, exportWorkspace, changesWorkOffsets, validPosition} from './model.js';
+import {WCS_SLOTS, ZERO, samePosition, requireCompleteReport, hasActiveG92, readModes, buildLoadProgram, verifyAgainstMachine, snapshot, recordChange, historyTarget, workspaceName, importWorkspace, exportWorkspace, changesWorkOffsets, validPosition, slotLabel} from './model.js';
 
 export function createWorkspaceService({controller, serverState, readSettings, saveSettings, readOffsets, broadcast = () => {}}) {
   let queue = Promise.resolve();
@@ -160,6 +160,14 @@ export function createWorkspaceService({controller, serverState, readSettings, s
         data.workspaces.push(workspace); commit(data); return {id: workspace.id};
       }
       case 'rename': find(data, input.id).name = workspaceName(input.name); commit(data); return {};
+      case 'label-slot': {
+        // Names only: no machine needed, and the coordinates are untouched.
+        if (!WCS_SLOTS.includes(input.slot)) throw new Error('Unknown WCS.');
+        const workspace = find(data, input.id), text = slotLabel(input.label);
+        workspace.labels = {...(workspace.labels ?? {})};
+        if (text) workspace.labels[input.slot] = text; else delete workspace.labels[input.slot];
+        commit(data); return {};
+      }
       case 'delete':
         find(data, input.id);
         data.workspaces = data.workspaces.filter(w => w.id !== input.id);

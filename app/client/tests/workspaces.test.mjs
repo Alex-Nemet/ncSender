@@ -214,3 +214,19 @@ test('client composable starts with shared refs and updates the active label and
   a.stop();assert.equal(listeners.size,0);
  } finally {globalThis.fetch=originalFetch;delete globalThis.__workspaceTestApi;}
 });
+
+test('WCS names are saved per workspace without touching the machine', async () => {
+  const h = harness();
+  const svc = h.service;
+  await svc.execute('capture', {name:'Default'});
+  const id = svc.state().workspaces[0].id, writesBefore = h.writes.length;
+  await svc.execute('label-slot', {id, slot:'G55', label:'  First pin station '});
+  assert.equal(svc.state().workspaces[0].labels.G55, 'First pin station');
+  assert.equal(h.writes.length, writesBefore);
+  await svc.execute('label-slot', {id, slot:'G55', label:''});
+  assert.equal(svc.state().workspaces[0].labels.G55, undefined);
+  await assert.rejects(svc.execute('label-slot', {id, slot:'G60', label:'x'}), /Unknown WCS/);
+  await assert.rejects(svc.execute('label-slot', {id, slot:'G54', label:'x'.repeat(41)}), /40 characters/);
+  const exported = exportWorkspace({...svc.state().workspaces[0], labels:{G56:'Turning'}});
+  assert.equal(importWorkspace(exported).labels.G56, 'Turning');
+});

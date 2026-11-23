@@ -63,7 +63,7 @@
           @change="onWorkspaceChange($event)"
           :disabled="isWorkspaceDisabled || workspaceBusy"
         >
-          <option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}</option>
+          <option v-for="ws in workspaces" :key="ws" :value="ws">{{ ws }}{{ wcsLabels?.[ws] ? ' · ' + wcsLabels[ws] : '' }}</option>
         </select>
       </div>
       <button
@@ -215,6 +215,7 @@ const props = defineProps<{
   showPendant?: boolean;
   workspaceSets?: Array<{ id: string; name: string }>;
   activeWorkspaceId?: string | null;
+  wcsLabels?: Record<string, string>;
   workspaceBusy?: boolean;
   workspaceError?: string;
   workspaceMessage?: string;
@@ -469,10 +470,9 @@ const onWorkspaceChange = (e: Event) => {
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* In the row, not floating over it: wide workspace controls push it aside instead of being covered. */
 .toolbar__center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -483,7 +483,7 @@ const onWorkspaceChange = (e: Event) => {
   display: flex;
   align-items: center;
   gap: var(--gap-xs);
-  flex: 1;
+  flex: 1 1 0;
 }
 
 .logo-image {
@@ -741,7 +741,7 @@ const onWorkspaceChange = (e: Event) => {
   display: flex;
   align-items: center;
   gap: var(--gap-xs);
-  flex: 1;
+  flex: 1 1 0;
   justify-content: flex-end;
 }
 

@@ -38,10 +38,11 @@
             <button class="ws-btn" :disabled="busy || !renameText.trim() || renameText.trim() === selected.name" @click="doRename">Rename</button>
           </div>
           <table class="ws-table">
-            <thead><tr><th>WCS</th><th>X mm</th><th>Y mm</th><th>Z mm</th><th></th></tr></thead>
+            <thead><tr><th>WCS</th><th>Name</th><th>X mm</th><th>Y mm</th><th>Z mm</th><th></th></tr></thead>
             <tbody>
               <tr v-for="slot in SLOTS" :key="slot" :class="{unset: !selected.slots[slot]}">
                 <td class="mono">{{ slot }}</td>
+                <td><input class="ws-input ws-label" maxlength="40" placeholder="e.g. First pin station" :value="selected.labels?.[slot] ?? ''" :disabled="busy" :aria-label="`Name for ${slot}`" @change="doLabel(slot, ($event.target as HTMLInputElement).value)" @keydown.enter="($event.target as HTMLInputElement).blur()" /></td>
                 <template v-if="selected.slots[slot]">
                   <td class="mono">{{ format(selected.slots[slot]?.x) }}</td>
                   <td class="mono">{{ format(selected.slots[slot]?.y) }}</td>
@@ -135,6 +136,10 @@ const doVerify = () => run(async () => {
   message.value = result.ok ? 'Machine matches. This workspace is now marked current.' : `Does not match: ${result.rows.filter((r: any) => !['ok', 'unset'].includes(r.state)).map((r: any) => r.slot).join(', ')}.`;
 });
 const doSaveSlot = (slot: WcsSlot) => run(async () => {await ws.act('save-slot', {id: selectedId.value, slot});});
+const doLabel = (slot: WcsSlot, label: string) => {
+  if ((selected.value?.labels?.[slot] ?? '') === label.trim()) return;
+  return run(async () => {await ws.act('label-slot', {id: selectedId.value, slot, label});});
+};
 const doHistory = (direction: string) => run(async () => {
   await ws.act(direction, {id: selectedId.value});
   message.value = `${direction === 'undo' ? 'Undo' : 'Redo'} complete. Controller coordinates verified.`;
@@ -184,6 +189,7 @@ const when = (iso: string) => new Date(iso).toLocaleString();
 .ws-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
 .ws-table th { text-align: left; font-weight: 600; opacity: .7; padding: 4px 6px; border-bottom: 1px solid #ffffff22; }
 .ws-table td { padding: 5px 6px; border-bottom: 1px solid #ffffff11; }
+.ws-label { width: 100%; min-width: 140px; font-size: 13px; padding: 3px 6px; }
 .mono { font-family: ui-monospace, monospace; }
 .muted { opacity: .55; }
 .hint { font-size: 11px; opacity: .7; }

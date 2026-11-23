@@ -54,6 +54,7 @@
         @unlock="handleUnlock"
         :workspace-sets="workspaceSets"
         :active-workspace-id="activeWorkspaceId"
+        :wcs-labels="activeWcsLabels"
         :workspace-busy="workspacesStore.busy.value"
         :workspace-error="workspacesStore.error.value"
         :workspace-message="workspacesStore.message.value"
@@ -1326,6 +1327,7 @@ const requestedWorkspaceId = ref<string | null>(null);
 const workspacesStore = useWorkspaces();
 const workspaceSets = computed(() => workspacesStore.workspaces.value.map(w => ({ id: w.id, name: w.name })));
 const activeWorkspaceId = computed(() => workspacesStore.activeId.value);
+const activeWcsLabels = computed(() => workspacesStore.workspaces.value.find(w => w.id === workspacesStore.activeId.value)?.labels ?? {});
 
 const handleWorkspaceSetChange = async (id: string) => {
   if (!id) return;

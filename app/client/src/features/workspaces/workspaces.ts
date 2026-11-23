@@ -8,6 +8,7 @@ export interface WorkspaceChange {
 }
 export interface Workspace {
   id: string; name: string; note?: string;
+  labels?: Partial<Record<WcsSlot, string>>;
   slots: Partial<Record<WcsSlot, SavedPosition>>;
   createdAt: string; history?: WorkspaceChange[]; historyIndex?: number;
 }

@@ -99,9 +99,24 @@ export function workspaceName(name) {
   if (typeof name !== 'string' || !name.trim() || name.trim().length > 100) throw new Error('Use a workspace name between 1 and 100 characters.');
   return name.trim();
 }
+// A short name for one WCS in a workspace, e.g. "First pin station". Empty clears it.
+export function slotLabel(text) {
+  if (text == null) return '';
+  if (typeof text !== 'string') throw new Error('Use plain text for the WCS name.');
+  const trimmed = text.trim();
+  if (trimmed.length > 40) throw new Error('Keep WCS names to 40 characters or fewer.');
+  return trimmed;
+}
+export function cleanLabels(labels) {
+  const out = {};
+  for (const slot of WCS_SLOTS) {
+    try { const t = slotLabel(labels?.[slot]); if (t) out[slot] = t; } catch {}
+  }
+  return out;
+}
 export function exportWorkspace(workspace) {
   buildLoadProgram(workspace);
-  return {format: 'ncsender-workspace', version: 1, units: 'mm', exportedAt: new Date().toISOString(), workspace: {name: workspace.name, note: workspace.note ?? '', slots: structuredClone(workspace.slots)}};
+  return {format: 'ncsender-workspace', version: 1, units: 'mm', exportedAt: new Date().toISOString(), workspace: {name: workspace.name, note: workspace.note ?? '', labels: cleanLabels(workspace.labels), slots: structuredClone(workspace.slots)}};
 }
 export function importWorkspace(data) {
   if (data?.format !== 'ncsender-workspace' || data.version !== 1 || data.units !== 'mm') throw new Error('Choose a version 1 ncSender workspace export in millimetres.');
@@ -114,7 +129,7 @@ export function importWorkspace(data) {
     if (!WCS_SLOTS.includes(slot) || !validPosition(value)) throw new Error(`Invalid coordinates for ${slot}.`);
     slots[slot] = {x: value.x, y: value.y, z: value.z, savedAt: now};
   }
-  return {id: crypto.randomUUID(), name, note: typeof input.note === 'string' ? input.note.slice(0, 2000) : '', slots, createdAt: now, history: [], historyIndex: 0};
+  return {id: crypto.randomUUID(), name, note: typeof input.note === 'string' ? input.note.slice(0, 2000) : '', labels: cleanLabels(input.labels), slots, createdAt: now, history: [], historyIndex: 0};
 }
 export function changesWorkOffsets(command) {
   const code = String(command).replace(/\([^)]*\)|;.*/g, '').toUpperCase();
